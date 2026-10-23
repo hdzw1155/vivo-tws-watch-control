@@ -222,5 +222,68 @@
             android:text="@string/btn_refresh"
             android:textColor="#5B8DEF"
             android:textSize="11sp" />
+
+        <!-- 开发者设置入口: 连点5下解锁(状态持久化); 解锁后显示实验功能卡片 -->
+        <TextView
+            android:id="@+id/dev_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:padding="8dp"
+            android:text="@string/dev_section"
+            android:textColor="#3C3C40"
+            android:textSize="10sp" />
+
+        <LinearLayout
+            android:id="@+id/dev_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:layout_marginTop="4dp"
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/spatial_switch"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
+
+                <Switch
+                    android:id="@+id/switch_spatial"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/spatial_caption"
+                android:textColor="#6E6E73"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <!-- 免责声明: 常驻最底部 -->
+        <TextView
+            android:id="@+id/disclaimer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/disclaimer"
+            android:textColor="#4A4A4E"
+            android:textSize="9sp" />
     </LinearLayout>
 </ScrollView>

@@ -15,8 +15,10 @@ import android.os.Looper;
 import android.os.ParcelUuid;
 import android.os.SystemClock;
 import android.view.View;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -53,6 +55,12 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private int lastMode = -1;
     private long connectStartAt = 0;
     private Runnable refresher;
+    private Switch swSpatial;
+    private boolean spatialGuard;
+    private long spatialSetAt = 0;
+    private View devSection;
+    private int devTaps = 0;
+    private long lastTapAt = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +81,45 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         barR = findViewById(R.id.bar_r);
         barC = findViewById(R.id.bar_c);
         View refresh = findViewById(R.id.btn_refresh);
+        swSpatial = findViewById(R.id.switch_spatial);
+        devSection = findViewById(R.id.dev_section);
+
+        // 开发者设置: 默认关闭,连点入口 5 下本会话内显示(不持久化)
+        final TextView devHint = findViewById(R.id.dev_hint);
+        devHint.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                long now = SystemClock.elapsedRealtime();
+                devTaps = (now - lastTapAt > 2000) ? 1 : devTaps + 1;
+                lastTapAt = now;
+                if (devTaps >= 5 && devSection.getVisibility() != View.VISIBLE) {
+                    devSection.setVisibility(View.VISIBLE);
+                    Toast.makeText(MainActivity.this, R.string.dev_unlocked_toast,
+                            Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        swSpatial.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(CompoundButton b, boolean isChecked) {
+                if (spatialGuard) return;
+                spatialSetAt = SystemClock.elapsedRealtime();
+                // 首次启用弹个别化风险确认,记住后不再打扰(履行个别警示义务)
+                if (isChecked && !getSharedPreferences("cfg", MODE_PRIVATE)
+                        .getBoolean("spatial_ack", false)) {
+                    spatialGuard = true;
+                    swSpatial.setChecked(false);
+                    spatialGuard = false;
+                    showSpatialDialog();
+                    return;
+                }
+                Toast.makeText(MainActivity.this, R.string.spatial_toast, Toast.LENGTH_SHORT).show();
+                if (client != null && client.isConnected()) {
+                    client.setSpatial(isChecked);
+                } else {
+                    Toast.makeText(MainActivity.this, "未连接", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
         findViewById(R.id.mode_off).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { setMode(GaiaClient.MODE_OFF); }
         });
@@ -106,6 +153,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                     if (client != null && client.isConnected()) {
                         client.queryBattery();
                         client.queryNoise();
+                        client.querySpatial();
                     } else if (client == null
                             || SystemClock.elapsedRealtime() - connectStartAt > 12000) {
                         // 没有进行中的连接尝试才重连,避免打断慢连接
@@ -128,6 +176,26 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
             client.disconnect();
             client = null;
         }
+    }
+
+    /** 首次启用空间音频的个别化风险确认框,确认后记住(spatial_ack) */
+    private void showSpatialDialog() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.spatial_dialog_title)
+                .setMessage(R.string.spatial_dialog_msg)
+                .setCancelable(false)
+                .setPositiveButton(R.string.dialog_ok, new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int w) {
+                        getSharedPreferences("cfg", MODE_PRIVATE).edit()
+                                .putBoolean("spatial_ack", true).apply();
+                        spatialSetAt = SystemClock.elapsedRealtime();
+                        if (client != null && client.isConnected()) {
+                            client.setSpatial(true);
+                        }
+                    }
+                })
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
     }
 
     private boolean hasPerm() {
@@ -265,6 +333,20 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         renderMode();
     }
 
+    @Override
+    public void onSpatial(final Boolean state) {
+        if (state == null) return;
+        ui.post(new Runnable() {
+            @Override public void run() {
+                // 手动设置后 4 秒内不回写,避免查询结果盖掉用户刚点的状态
+                if (SystemClock.elapsedRealtime() - spatialSetAt < 4000) return;
+                spatialGuard = true;
+                swSpatial.setChecked(state);
+                spatialGuard = false;
+            }
+        });
+    }
+
     /** 未连接时清空电量显示与模式选中态 */
     private void clearData() {
         setBatt(pctL, barL, -1, false);
@@ -272,6 +354,13 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         setBatt(pctC, barC, -1, false);
         lastMode = -1;
         renderMode();
+        ui.post(new Runnable() {
+            @Override public void run() {
+                spatialGuard = true;
+                swSpatial.setChecked(false);
+                spatialGuard = false;
+            }
+        });
     }
 
     @Override

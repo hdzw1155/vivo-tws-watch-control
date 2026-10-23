@@ -33,6 +33,12 @@ public class GaiaClient {
     public static final int CMD_NOISE_QUERY = 0x0230;
     public static final int CMD_BATT_QUERY = 0x0207;
 
+    // 空间音频: 命令号来自反编译推断(TWS-Pods-PC),未官方证实,格式按开关类 [state] 模式
+    public static final int CMD_SPATIAL_SET = 0x0139;
+    public static final int CMD_SPATIAL_QUERY = 0x0239;
+    public static final int RESP_SPATIAL_ACK = 0x8139;
+    public static final int RESP_SPATIAL = 0x8239;
+
     public static final int MODE_ANC = 0x00;
     public static final int MODE_OFF = 0x01;
     public static final int MODE_TRANS = 0x02;
@@ -66,6 +72,9 @@ public class GaiaClient {
         void onBattery(int left, int right, int box, int chargeFlags);
 
         void onNoiseMode(int mode);
+
+        /** 空间音频状态; null 表示耳机未确认/无法解析(指令为实验性) */
+        void onSpatial(Boolean state);
     }
 
     private final List<Listener> listeners = new CopyOnWriteArrayList<Listener>();
@@ -105,6 +114,27 @@ public class GaiaClient {
 
     private void fireMode(int mode) {
         for (Listener l : listeners) l.onNoiseMode(mode);
+    }
+
+    private void fireSpatial(Boolean state) {
+        for (Listener l : listeners) l.onSpatial(state);
+    }
+
+    /**
+     * 空间音频应答解析(实验): 参照开关类 [..][state] 模式(0=关,非0=开),
+     * 解析不了就返回 null,原始字节已在 logcat 里留档。
+     */
+    private static Boolean parseSpatial(byte[] p) {
+        if (p == null || p.length == 0) return null;
+        if (p.length == 1) return (p[0] & 0xFF) != 0;
+        if ((p[0] & 0xFF) == 0) return (p[p.length - 1] & 0xFF) != 0;
+        return null;
+    }
+
+    private static String toHex(byte[] b) {
+        StringBuilder sb = new StringBuilder();
+        for (byte x : b) sb.append(String.format("%02X ", x));
+        return sb.toString().trim();
     }
 
     public boolean isConnected() {
@@ -217,6 +247,22 @@ public class GaiaClient {
         writeFrame(cfg == CFG_FAMILY_V4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_NOISE_SET, payload);
     }
 
+    // ---- 空间音频(实验性) ----
+
+    public void querySpatial() {
+        boolean v4 = cfg == CFG_FAMILY_V4;
+        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_SPATIAL_QUERY,
+                v4 ? new byte[]{0x00} : null);
+    }
+
+    /** 空间音频开关: v3/v4 均被耳机接受,取与降噪一致的 verb; 载荷 [01]=开 [00]=关
+     *  (真机探测确认: Air3 Pro 上 v3 [01] 使 0x8239 状态翻转为 01) */
+    public void setSpatial(boolean on) {
+        boolean v4 = cfg == CFG_FAMILY_V4;
+        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_SPATIAL_SET,
+                new byte[]{(byte) (on ? 0x01 : 0x00)});
+    }
+
     // ---- 接收 ----
 
     private void startReader() {
@@ -243,6 +289,17 @@ public class GaiaClient {
                                 && (cmd == RESP_NOISE_QUERY || cmd == RESP_NOISE_SET)
                                 && payload.length >= 2) {
                             fireMode(payload[1] & 0xFF);
+                        } else if (vendor == VENDOR_VIVO
+                                && (cmd == RESP_SPATIAL || cmd == RESP_SPATIAL_ACK)) {
+                            android.util.Log.d("GaiaClient",
+                                    "spatial cmd=0x" + Integer.toHexString(cmd)
+                                            + " payload=" + toHex(payload));
+                            fireSpatial(parseSpatial(payload));
+                        } else if (vendor == VENDOR_VIVO) {
+                            // 未知帧全量记录,留作协议分析 ground truth
+                            android.util.Log.d("GaiaClient",
+                                    "unknown cmd=0x" + Integer.toHexString(cmd)
+                                            + " payload=" + toHex(payload));
                         }
                     }
                     if (!closing) fireDisconnected("连接已关闭");
