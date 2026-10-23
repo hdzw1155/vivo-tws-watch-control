@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
+import android.os.SystemClock;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -50,6 +51,8 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private ProgressBar barR;
     private ProgressBar barC;
     private int lastMode = -1;
+    private long connectStartAt = 0;
+    private Runnable refresher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,12 +98,32 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     protected void onResume() {
         super.onResume();
         tryConnect();
+        // 周期自检: 连着就刷新状态,断了(比如耳机开关机)就自动重连
+        if (refresher == null) {
+            refresher = new Runnable() {
+                @Override public void run() {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (client != null && client.isConnected()) {
+                        client.queryBattery();
+                        client.queryNoise();
+                    } else if (client == null
+                            || SystemClock.elapsedRealtime() - connectStartAt > 12000) {
+                        // 没有进行中的连接尝试才重连,避免打断慢连接
+                        tryConnect();
+                    }
+                    ui.postDelayed(this, 5000);
+                }
+            };
+        }
+        ui.removeCallbacks(refresher);
+        ui.postDelayed(refresher, 5000);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         // 手表应用切后台就断开,省电
+        ui.removeCallbacks(refresher);
         if (client != null) {
             client.disconnect();
             client = null;
@@ -142,15 +165,23 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
             return;
         }
         if (client != null && client.isConnected()) return;
+        // 灭掉残留的旧连接(含还在握手的线程),防止新旧两个客户端打架
+        if (client != null) {
+            client.disconnect();
+            client = null;
+        }
 
         BluetoothAdapter adapter =
                 ((BluetoothManager) getSystemService(BLUETOOTH_SERVICE)).getAdapter();
         if (adapter == null || !adapter.isEnabled()) {
+            clearData();
             status.setText("请先打开手表蓝牙");
+            sub.setText("");
             return;
         }
         BluetoothDevice target = findTarget(adapter);
         if (target == null) {
+            clearData();
             status.setText("未找到已配对的 vivo 耳机");
             sub.setText("请先在 手表设置-蓝牙 配对");
             return;
@@ -159,6 +190,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         sub.setTextColor(COL_LABEL_GRAY);
         sub.setText(target.getName());
         client = new GaiaClient(this);
+        connectStartAt = SystemClock.elapsedRealtime();
         client.connect(target);
     }
 
@@ -213,9 +245,9 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         ui.post(new Runnable() {
             @Override public void run() {
                 status.setTextColor(Color.WHITE);
-                status.setText(deviceName);
-                sub.setTextColor(COL_GREEN);
-                sub.setText("已连接");
+                status.setText("已连接");
+                sub.setTextColor(COL_LABEL_GRAY);
+                sub.setText(deviceName);
             }
         });
     }
@@ -233,21 +265,41 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         renderMode();
     }
 
+    /** 未连接时清空电量显示与模式选中态 */
+    private void clearData() {
+        setBatt(pctL, barL, -1, false);
+        setBatt(pctR, barR, -1, false);
+        setBatt(pctC, barC, -1, false);
+        lastMode = -1;
+        renderMode();
+    }
+
     @Override
     public void onDisconnected(String reason) {
+        clearData();
         ui.post(new Runnable() {
             @Override public void run() {
                 status.setTextColor(COL_LABEL_GRAY);
                 status.setText(R.string.status_idle);
                 sub.setText("");
-                lastMode = -1;
-                renderMode();
             }
         });
+        // 耳机开关机/走远断连后,3 秒后自动试着连回来
+        if (!isFinishing() && !isDestroyed()) {
+            ui.postDelayed(new Runnable() {
+                @Override public void run() {
+                    if (!isFinishing() && !isDestroyed()
+                            && (client == null || !client.isConnected())) {
+                        tryConnect();
+                    }
+                }
+            }, 3000);
+        }
     }
 
     @Override
     public void onError(final String msg) {
+        clearData();
         ui.post(new Runnable() {
             @Override public void run() {
                 status.setTextColor(COL_LABEL_GRAY);

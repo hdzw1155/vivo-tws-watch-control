@@ -132,8 +132,13 @@ public class GaiaClient {
                     out = socket.getOutputStream();
                 } catch (Exception e) {
                     safeClose();
+                    if (closing) return; // 已被新的连接替代,不再回调
                     fireError("连接失败: " + e.getMessage()
                             + "\n(耳机未与手表配对? 或耳机已占满两个连接)");
+                    return;
+                }
+                if (closing) {
+                    safeClose();
                     return;
                 }
                 fireConnected(device.getName());
@@ -243,6 +248,8 @@ public class GaiaClient {
                 } catch (IOException e) {
                     if (!closing) fireDisconnected("连接断开: " + e.getMessage());
                 }
+                // 断开后真正关闭 socket,让 isConnected() 反映真实状态
+                safeClose();
             }
         }, "gaia-reader").start();
     }
