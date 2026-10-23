@@ -46,7 +46,7 @@ vivo / iQOO TWS 家族（TWS 3 代起）共用一套 GAIA 私有协议，App 按
 1. **手表与耳机完成蓝牙配对**：手表 设置 → 连接 → 蓝牙 → 配对新设备（耳机放回充电盒再开盖进入配对模式）。RFCOMM 安全通道要求已配对。
 2. 安装 APK（任选其一）：
    - **电脑 ADB**：从 [Releases](../../releases) 下载 `vivo-tws-watch-debug.apk`，`adb install -r` 装到手表
-   - **免电脑（推荐）**：手机安装 **WearOS 工具箱** → 连接手表 → 「安装本地 APK」选择下载的 apk；装不上就在工具箱设置里开启「使用特殊的安装方式」
+   - **免电脑（推荐）**：手机安装 **WearOS 工具箱** → 连接手表 → 「安装本地 APK」选择下载的 apk
    - 或自行构建：Windows 下依次运行 `scripts\setup-env.bat`（首次，装 JDK17 + Android SDK，约 300MB）→ `scripts\build.bat`（免 Gradle，一键出包）
 3. 手表上打开"vivo 耳机控制"，授权附近设备权限即用。
 
