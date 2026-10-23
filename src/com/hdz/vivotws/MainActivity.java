@@ -61,6 +61,8 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private View devSection;
     private int devTaps = 0;
     private long lastTapAt = 0;
+    private boolean disclaimerOk = false;
+    private boolean disclaimerDialogUp = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -198,6 +200,32 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                 .show();
     }
 
+    /** 首次启动的全局免责确认框,同意后记住(disclaimer_ack) */
+    private void showDisclaimerDialog() {
+        if (disclaimerDialogUp) return;
+        disclaimerDialogUp = true;
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.global_disclaimer_title)
+                .setMessage(R.string.global_disclaimer_msg)
+                .setCancelable(false)
+                .setPositiveButton(R.string.dialog_agree, new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int w) {
+                        getSharedPreferences("cfg", MODE_PRIVATE).edit()
+                                .putBoolean("disclaimer_ack", true).apply();
+                        disclaimerOk = true;
+                        disclaimerDialogUp = false;
+                        tryConnect();
+                    }
+                })
+                .setNegativeButton(R.string.dialog_refuse, new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int w) {
+                        disclaimerDialogUp = false;
+                        finish();
+                    }
+                })
+                .show();
+    }
+
     private boolean hasPerm() {
         return Build.VERSION.SDK_INT < 31
                 || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -228,6 +256,12 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     }
 
     private void tryConnect() {
+        // 首次使用先过全局免责确认(记住后不再弹),侧载用户也能看到
+        if (!disclaimerOk && !getSharedPreferences("cfg", MODE_PRIVATE)
+                .getBoolean("disclaimer_ack", false)) {
+            showDisclaimerDialog();
+            return;
+        }
         if (!hasPerm()) {
             requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_PERM);
             return;

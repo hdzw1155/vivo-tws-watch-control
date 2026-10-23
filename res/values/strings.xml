@@ -17,5 +17,9 @@
     <string name="spatial_dialog_msg">空间音频为实验性功能，目前开发中、暂无实际效果：仅限 vivo TWS Air3 Pro 适配，指令来自社区逆向协议、未获官方认证，未来固件更新后可能失效；切换瞬间音效可能突变，请先调低播放音量。是否继续启用？</string>
     <string name="dialog_ok">已了解风险，继续</string>
     <string name="dialog_cancel">取消</string>
+    <string name="global_disclaimer_title">免责声明</string>
+    <string name="global_disclaimer_msg">本应用为非官方、未获授权的第三方学习研究工具，通过逆向私有协议控制耳机，不收集、不上传任何数据。\n\n安全提示：首次连接新机型、固件升级后首次使用或开启实验性功能时，请先将耳机取下（勿佩戴入耳）并将音量调至最低，确认无异常爆音或啸叫后再佩戴；请勿在驾驶、骑行等需要集中注意力的场景下使用。\n\n使用风险自担。是否同意并继续？</string>
+    <string name="dialog_agree">我已知晓并同意</string>
+    <string name="dialog_refuse">不同意并退出</string>
     <string name="disclaimer">免责声明：本应用为个人学习研究作品，与 vivo / 三星 / 高通无关。「开发者设置」内为实验性功能，指令来自社区反编译推断并经真机探测校准，仅限 vivo TWS Air3 Pro 验证，其他耳机不一定适配。实验功能切换瞬间音效可能突变，请在调低播放音量的前提下使用。使用本应用的一切风险——包括但不限于听力不适、财产损失、耳机固件异常、数据丢失及软件安全风险——由使用者自行承担，作者不对任何直接或间接损失负责。</string>
 </resources>
