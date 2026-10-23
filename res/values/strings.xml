@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">vivo 耳机控制</string>
+    <string name="status_idle">未连接</string>
+    <string name="status_connecting">连接中…</string>
+    <string name="noise_title">噪声控制</string>
+    <string name="btn_anc">降噪开</string>
+    <string name="btn_off">降噪关</string>
+    <string name="btn_trans">通透</string>
+    <string name="btn_refresh">刷新电量</string>
+</resources>
