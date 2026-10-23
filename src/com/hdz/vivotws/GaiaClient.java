@@ -48,6 +48,7 @@ public class GaiaClient {
         String n = name.toLowerCase().replaceAll("[^a-z0-9]", "");
         if (n.contains("air3")) return CFG_AIR3_PRO;
         if (n.contains("3e")) return CFG_TWS_3E;
+        if (n.contains("tws3")) return CFG_TWS_3E; // TWS 3/3 Pro 与 3e 同代,推断同配置
         return CFG_FAMILY_V4;
     }
 

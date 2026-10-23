@@ -19,15 +19,20 @@
 
 ## 🎧 支持的耳机
 
-vivo / iQOO TWS 家族共用一套 GAIA 私有协议，本 App 内置三套机型线格式差异配置，按蓝牙设备名自动选择，未知机型走家族默认配置：
+vivo / iQOO TWS 家族（TWS 3 代起）共用一套 GAIA 私有协议，App 按蓝牙设备名自动选择机型配置（含 `air3` → Air3 Pro 配置；含 `3e`/`tws3` → TWS 3e 配置；其余 → 家族默认 v4，即 TWS 4 的实测配置）：
 
-| 耳机 | 状态 |
-| --- | --- |
-| vivo TWS Air3 Pro | ✅ 实机验证（Galaxy Watch7 上全功能） |
-| vivo TWS 3e | ✅ 协议文档验证（配置来自公开逆向文档） |
-| vivo TWS 4 / TWS 3 系列 / iQOO TWS 系列等其他家族机型 | ⚡ 同族协议，理论兼容，未逐一实测 |
+| 支持度 | 机型 | 依据 |
+| --- | --- | --- |
+| ✅ 实机验证 | **vivo TWS Air3 Pro** | 本项目在 Galaxy Watch7 上全功能实测（降噪三态 + 电量） |
+| ✅ 社区真机验证 | **vivo TWS 3e**、**TWS 4 / TWS 4 Hi-Fi**、**TWS 5** | [TWS-Pods-PC](https://github.com/Zhaoyi-ya/TWS-Pods-PC) 真机抓包（3e 全套 + TWS 4 电量/降噪帧）、vivopods-mac 真机验证（TWS 5），命令与本 App 一致 |
+| ⚡ 理论兼容 | vivo TWS 3 / TWS 3 Pro、TWS Air / Air 2 / Air 3、TWS 5e、TWS A1 / A1 Pro、iQOO TWS 1 / Air / Air Pro / Air3 Pro | 同族协议画像（HyperEars 零售名录 + Star-ZER0 家族默认配置），配置按代际推断 |
+| ❓ 未验证 | vivo TWS Neo / TWS 2 / TWS 2e / 初代 TWS（2020-2021 代次） | 协议代次较早，无公开验证记录，不保证可用 |
 
-非 vivo 家族耳机不受支持（协议不同，如 AirPods / Marshall / Sony 等）。
+说明：
+
+- **理论兼容**机型若降噪切换无反应，多半是机型尾缀差异，欢迎提 issue 注明耳机型号
+- 本 App 连接后主动查询电量/降噪并周期轮询，**不依赖**"注册通知链"，对两代初始化分支（TWS 4 系发链 / TWS 5 不发链）都适用
+- 非 vivo 家族耳机不受支持（协议不同，如 AirPods / Marshall / Sony 等）
 
 ## 📸 截图
 
@@ -39,7 +44,8 @@ vivo / iQOO TWS 家族共用一套 GAIA 私有协议，本 App 内置三套机�
 
 1. **手表与耳机完成蓝牙配对**：手表 设置 → 连接 → 蓝牙 → 配对新设备（耳机放回充电盒再开盖进入配对模式）。RFCOMM 安全通道要求已配对。
 2. 安装 APK（任选其一）：
-   - 从 [Releases](../../releases) 下载 `vivo-tws-watch-debug.apk`，`adb install -r` 装到手表
+   - **电脑 ADB**：从 [Releases](../../releases) 下载 `vivo-tws-watch-debug.apk`，`adb install -r` 装到手表
+   - **免电脑（推荐）**：手机安装 **WearOS 工具箱** → 连接手表 → 「安装本地 APK」选择下载的 apk。部分系统需在工具箱设置里开启「使用特殊的安装方式」；华为手表请开启「特殊的ADB安装模式」，其他手表勿开
    - 或自行构建：Windows 下依次运行 `scripts\setup-env.bat`（首次，装 JDK17 + Android SDK，约 300MB）→ `scripts\build.bat`（免 Gradle，一键出包）
 3. 手表上打开"vivo 耳机控制"，授权附近设备权限即用。
 
@@ -87,7 +93,7 @@ Wear OS 手表控制器）装到我的 Wear OS 手表上，步骤：
 | --- | --- | --- | --- | --- |
 | Air3 Pro | 3 | 空 | `04 00` | 实机抓包 |
 | TWS 3e | 3 | 空 | `03` | 公开文档 |
-| 家族默认 | 4 | `00` | `03 01` | 公共画像 |
+| 家族默认(=TWS 4) | 4 | `00` | `03 01` | TWS 4 真机抓包 |
 
 - **架构决策**：手表只做"遥控器"——不开音频通道，仅维持一条 RFCOMM 控制连接（连上即查状态，切后台即断开），耳机与手机的多点音频连接不受影响；纯 Java + 系统控件零第三方依赖，免 Gradle 用 aapt2/javac/d8 手工构建，仓库里两个脚本一键复现。
 
@@ -97,9 +103,10 @@ Wear OS 手表控制器）装到我的 Wear OS 手表上，步骤：
 
 本项目的协议知识全部站在前人肩膀上，向以下开源项目与作者致敬：
 
-- **[silverpoetry/HyperEars](https://github.com/silverpoetry/HyperEars)** — vivo/iQOO TWS 家族协议画像、Air 3 Pro 实机抓包记录与三套机型线格式配置（WireConfig），本 App 的多机型参数直接源自该项目
-- **[Zhaoyi-ya/TWS-Pods-PC](https://github.com/Zhaoyi-ya/TWS-Pods-PC)** — vivo TWS 3e 私有协议逆向文档（vivo/PROTOCOL.md），含 btsnoop 抓包方法论
+- **[silverpoetry/HyperEars](https://github.com/silverpoetry/HyperEars)** — vivo/iQOO TWS 家族协议画像、零售机型名录、Air 3 Pro 实机抓包记录与三套机型线格式配置（WireConfig），本 App 的多机型参数直接源自该项目
+- **[Zhaoyi-ya/TWS-Pods-PC](https://github.com/Zhaoyi-ya/TWS-Pods-PC)** — vivo TWS 私有协议逆向文档（vivo/PROTOCOL.md）：3e 全套实测、TWS 4 真机抓包、TWS 5（vivopods-mac / FxRayHughes）交叉验证、代际差异与 btsnoop 抓包方法论
 - **[Star-ZER0/Pods-Protocol-Reverse](https://github.com/Star-ZER0/Pods-Protocol-Reverse)** — vivo TWS 公共协议画像（家族默认参数来源）
+- **OPPO-Pods-For-Windows**（C# 实现，覆盖 TWS 4 系 / Air3 Pro / TWS 3e）与 **vivopods-mac**（macOS，TWS 5 验证）——同族协议的多平台独立实现，交叉印证了命令空间
 - Qualcomm **GAIA** 框架的公开文档与 [c0ffee-audio/marshall-protocol](https://github.com/c0ffee-audio/marshall-protocol) 等项目提供的 GAIA 帧格式参照
 
 本项目为个人兴趣作品，与 vivo/三星/高通无关；逆向协议仅用于个人设备的学习研究，请勿用于商业用途。
