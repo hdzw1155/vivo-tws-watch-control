@@ -27,7 +27,9 @@ public class ModeCyclerActivity extends Activity implements GaiaClient.Listener 
         super.onCreate(savedInstanceState);
         SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
         int last = cfg.getInt("tile_mode", GaiaClient.MODE_OFF);
-        nextMode = (last + 1) % 3;
+        // 磁贴上传来的指定档位(点谁切谁); 没传就循环下一档
+        int wanted = getIntent().getIntExtra("target_mode", -1);
+        nextMode = wanted >= 0 ? wanted : (last + 1) % 3;
 
         BluetoothAdapter adapter =
                 ((BluetoothManager) getSystemService(BLUETOOTH_SERVICE)).getAdapter();
@@ -53,6 +55,8 @@ public class ModeCyclerActivity extends Activity implements GaiaClient.Listener 
 
     @Override
     public void onConnected(String deviceName) {
+        getSharedPreferences("cfg", MODE_PRIVATE).edit()
+                .putLong("tile_last_ok", System.currentTimeMillis()).apply();
         if (client != null) client.setNoiseMode(nextMode);
     }
 
@@ -64,6 +68,7 @@ public class ModeCyclerActivity extends Activity implements GaiaClient.Listener 
         cfg.edit()
                 .putInt("tile_mode", mode)
                 .putString("tile_mode_name", NAMES[mode])
+                .putLong("tile_last_ok", System.currentTimeMillis())
                 .apply();
         // 让系统立刻重画磁贴, 不等刷新周期
         try {

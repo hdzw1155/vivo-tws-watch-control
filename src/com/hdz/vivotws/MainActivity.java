@@ -397,6 +397,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     public void onConnected(final String deviceName) {
         getSharedPreferences("cfg", MODE_PRIVATE).edit()
                 .putString("tile_status", "已连接")
+                .putLong("tile_last_ok", System.currentTimeMillis())
                 .putString("tile_name", deviceName == null ? "vivo 耳机" : deviceName)
                 .apply();
         ui.post(new Runnable() {
@@ -417,6 +418,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         // 给系统磁贴留快照(磁贴每 2 分钟读一次)
         SharedPreferences tileCfg = getSharedPreferences("cfg", MODE_PRIVATE);
         tileCfg.edit()
+                .putLong("tile_last_ok", System.currentTimeMillis())
                 .putString("tile_batt",
                         fmtBatt("左", left) + "  " + fmtBatt("右", right)
                                 + "  盒 " + fmtBatt("盒", box)

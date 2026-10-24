@@ -25,6 +25,8 @@ final class TileState {
         if (adapter == null || !adapter.isEnabled()) return "蓝牙关";
 
         SharedPreferences cfg = ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE);
+        long lastOk = cfg.getLong("tile_last_ok", 0);
+        if (System.currentTimeMillis() - lastOk < 30 * 60 * 1000L) return "已连接";
         String mac = cfg.getString("tile_mac", null);
         if (mac != null) {
             try {

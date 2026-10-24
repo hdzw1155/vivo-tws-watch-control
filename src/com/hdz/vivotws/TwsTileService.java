@@ -68,31 +68,31 @@ public class TwsTileService extends TileService {
     /** 运行时画一个电量环: 深色底 + 灰轨道 + 绿进度 + 环内"标签+百分比"两行字 */
     private byte[] renderRing(String label, int pct) {
         boolean known = pct >= 0 && pct <= 100;
-        Bitmap bmp = Bitmap.createBitmap(220, 220, Bitmap.Config.ARGB_8888);
+        Bitmap bmp = Bitmap.createBitmap(248, 248, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(bmp);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         p.setStyle(Paint.Style.FILL);
         p.setColor(0xFF1C1C1E);
-        c.drawCircle(110, 110, 100, p);
+        c.drawCircle(124, 124, 112, p);
 
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(13f);
+        p.setStrokeWidth(17f);
         p.setColor(0xFF3A3A3C);
-        c.drawCircle(110, 110, 88, p);
+        c.drawCircle(124, 124, 98, p);
 
         if (known) {
             p.setColor(0xFF30D158);
-            c.drawArc(22, 22, 198, 198, -90, 360f * pct / 100f, false, p);
+            c.drawArc(28, 28, 220, 220, -90, 360f * pct / 100f, false, p);
         }
 
         p.setColor(0xFFFFFFFF);
         p.setTextAlign(Paint.Align.CENTER);
-        p.setTextSize(known ? 38f : 44f);
+        p.setTextSize(known ? 44f : 48f);
         p.setFakeBoldText(true);
-        c.drawText(label, 110, 103, p);
-        p.setTextSize(46f);
-        c.drawText(known ? pct + "%" : "--", 110, 155, p);
+        c.drawText(label, 124, 116, p);
+        p.setTextSize(52f);
+        c.drawText(known ? pct + "%" : "--", 124, 174, p);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
@@ -110,7 +110,7 @@ public class TwsTileService extends TileService {
 
     /** 圆形降噪按钮: 蓝底=当前档, 深底=可切, 按钮下带名字 */
     private LayoutElementBuilders.LayoutElement modeButton(
-            String label, int target, boolean active) {
+            String resId, String label, int target, boolean active) {
         int bg = active ? 0xFF3478F6 : 0xFF262628;
 
         return new LayoutElementBuilders.Column.Builder()
@@ -138,12 +138,10 @@ public class TwsTileService extends TileService {
                                                 .build())
                                         .build())
                                 .build())
-                        .addContent(new LayoutElementBuilders.Text.Builder()
-                                .setText(label.equals("关闭") ? "⃠" : label.equals("通透") ? "◎" : "⊙")
-                                .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
-                                        .setSize(DimensionBuilders.sp(16f))
-                                        .setColor(ColorBuilders.argb(0xFFFFFFFF))
-                                        .build())
+                        .addContent(new LayoutElementBuilders.Image.Builder()
+                                .setResourceId(resId)
+                                .setWidth(DimensionBuilders.dp(18f))
+                                .setHeight(DimensionBuilders.dp(18f))
                                 .build())
                         .build())
                 .addContent(new LayoutElementBuilders.Text.Builder()
@@ -170,8 +168,8 @@ public class TwsTileService extends TileService {
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
                                         .setData(renderRing(EARS[0], l))
-                                        .setWidthPx(220)
-                                        .setHeightPx(220)
+                                        .setWidthPx(124)
+                                        .setHeightPx(124)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
@@ -179,8 +177,8 @@ public class TwsTileService extends TileService {
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
                                         .setData(renderRing(EARS[1], r))
-                                        .setWidthPx(220)
-                                        .setHeightPx(220)
+                                        .setWidthPx(124)
+                                        .setHeightPx(124)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
@@ -188,10 +186,25 @@ public class TwsTileService extends TileService {
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
                                         .setData(renderRing(EARS[2], c))
-                                        .setWidthPx(220)
-                                        .setHeightPx(220)
+                                        .setWidthPx(124)
+                                        .setHeightPx(124)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
+                                .build())
+                .addIdToImageMapping("ic_off",
+                        new ResourceBuilders.ImageResource.Builder()
+                                .setAndroidResourceByResId(new ResourceBuilders.AndroidImageResourceByResId.Builder()
+                                        .setResourceId(R.drawable.ic_off).build())
+                                .build())
+                .addIdToImageMapping("ic_trans",
+                        new ResourceBuilders.ImageResource.Builder()
+                                .setAndroidResourceByResId(new ResourceBuilders.AndroidImageResourceByResId.Builder()
+                                        .setResourceId(R.drawable.ic_trans).build())
+                                .build())
+                .addIdToImageMapping("ic_anc",
+                        new ResourceBuilders.ImageResource.Builder()
+                                .setAndroidResourceByResId(new ResourceBuilders.AndroidImageResourceByResId.Builder()
+                                        .setResourceId(R.drawable.ic_anc).build())
                                 .build())
                 .build();
         return done(res);
@@ -250,15 +263,15 @@ public class TwsTileService extends TileService {
                                                 .setHeight(DimensionBuilders.dp(8f))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Row.Builder()
-                                                .addContent(modeButton("关闭", 1, mode == 1))
+                                                .addContent(modeButton("ic_off", "关闭", 1, mode == 1))
                                                 .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                         .setWidth(DimensionBuilders.dp(14f))
                                                         .build())
-                                                .addContent(modeButton("通透", 2, mode == 2))
+                                                .addContent(modeButton("ic_trans", "通透", 2, mode == 2))
                                                 .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                         .setWidth(DimensionBuilders.dp(14f))
                                                         .build())
-                                                .addContent(modeButton("降噪", 0, mode == 0))
+                                                .addContent(modeButton("ic_anc", "降噪", 0, mode == 0))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                 .setHeight(DimensionBuilders.dp(6f))
