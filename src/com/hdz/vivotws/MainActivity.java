@@ -15,6 +15,7 @@ import android.os.Looper;
 import android.os.ParcelUuid;
 import android.os.SystemClock;
 import android.view.View;
+import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -58,6 +59,26 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private Switch swSpatial;
     private boolean spatialGuard;
     private long spatialSetAt = 0;
+    // DeepX 音效: 真实模式值 0/1/2/3/5(0x04 被官方跳过,悠扬听书=5),官方协议文档实锤
+    private static final String[] DEEPX_NAMES =
+            {"标准", "清澈人声", "超重低音", "清亮高音", "悠扬听书"};
+    private static final int[] DEEPX_MODES = {0, 1, 2, 3, 5};
+
+    /** DeepX 模式值 → 显示名(查表,未知值返回 未知) */
+    private static String deepxNameFor(int mode) {
+        for (int i = 0; i < DEEPX_MODES.length; i++) {
+            if (DEEPX_MODES[i] == mode) return DEEPX_NAMES[i];
+        }
+        return "未知";
+    }
+
+    // 空间音效预设(推断值 0..4): 标准/剧场/音乐厅/录音厅/演唱会
+    private static final String[] SPATIALFX_NAMES =
+            {"标准", "剧场", "音乐厅", "录音棚", "演唱会"};
+
+    private Button btnDeepx;
+    private int deepxMode = -1;   // 当前档位(数组下标)
+    private long deepxSetAt = 0;
     private View devSection;
     private int devTaps = 0;
     private long lastTapAt = 0;
@@ -84,6 +105,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         barC = findViewById(R.id.bar_c);
         View refresh = findViewById(R.id.btn_refresh);
         swSpatial = findViewById(R.id.switch_spatial);
+        btnDeepx = findViewById(R.id.btn_deepx);
         devSection = findViewById(R.id.dev_section);
 
         // 开发者设置: 默认关闭,连点入口 5 下本会话内显示(不持久化)
@@ -122,6 +144,20 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                 }
             }
         });
+        // DeepX 五档循环按钮(真实值 0/1/2/3/5); 只切音效不伤耳,不加确认弹窗
+        btnDeepx.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (client == null || !client.isConnected()) {
+                    Toast.makeText(MainActivity.this, "未连接", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                deepxMode = (deepxMode + 1) % DEEPX_NAMES.length;
+                deepxSetAt = SystemClock.elapsedRealtime();
+                btnDeepx.setText(DEEPX_NAMES[deepxMode]);
+                client.setDeepX(DEEPX_MODES[deepxMode]);
+            }
+        });
+
         findViewById(R.id.mode_off).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { setMode(GaiaClient.MODE_OFF); }
         });
@@ -156,6 +192,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                         client.queryBattery();
                         client.queryNoise();
                         client.querySpatial();
+                        client.queryDeepX();
                     } else if (client == null
                             || SystemClock.elapsedRealtime() - connectStartAt > 12000) {
                         // 没有进行中的连接尝试才重连,避免打断慢连接
@@ -381,6 +418,25 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         });
     }
 
+    @Override
+    public void onDeepX(final Integer mode) {
+        if (mode == null) return;
+        ui.post(new Runnable() {
+            @Override public void run() {
+                // 手动设置后 4 秒内不回写,避免查询结果盖掉用户刚点的状态
+                if (SystemClock.elapsedRealtime() - deepxSetAt < 4000) return;
+                String name = deepxNameFor(mode);
+                btnDeepx.setText(name);
+                if (!name.equals("未知")) {
+                    // 反查下标,让下次点击从当前档继续循环
+                    for (int i = 0; i < DEEPX_MODES.length; i++) {
+                        if (DEEPX_MODES[i] == mode) { deepxMode = i; break; }
+                    }
+                }
+            }
+        });
+    }
+
     /** 未连接时清空电量显示与模式选中态 */
     private void clearData() {
         setBatt(pctL, barL, -1, false);
@@ -388,11 +444,13 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         setBatt(pctC, barC, -1, false);
         lastMode = -1;
         renderMode();
+        deepxMode = -1;
         ui.post(new Runnable() {
             @Override public void run() {
                 spatialGuard = true;
                 swSpatial.setChecked(false);
                 spatialGuard = false;
+                btnDeepx.setText("--");
             }
         });
     }

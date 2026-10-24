@@ -39,6 +39,19 @@ public class GaiaClient {
     public static final int RESP_SPATIAL_ACK = 0x8139;
     public static final int RESP_SPATIAL = 0x8239;
 
+    // DeepX 音效: 命令号与格式已真机验证(Air3 Pro)——SET 单字节 [mode], ACK 0x8118 回 [00,mode],
+    // 查询 0x8218 回 [00,mode]; mode 0=标准 1=清澈人声 2=超重低音(真机验证), 3=清亮高音 4=悠扬听书(按官方 App 显示顺序推断,未实测)
+    public static final int CMD_DEEPX_SET = 0x0118;
+    public static final int CMD_DEEPX_QUERY = 0x0218;
+    public static final int RESP_DEEPX_ACK = 0x8118;
+    public static final int RESP_DEEPX = 0x8218;
+
+    // 空间音效预设(标准/剧场/音乐厅/录音棚/演唱会): 命令号来自官方 APK 反编译,未实测
+    public static final int CMD_SPATIALFX_SET = 0x013E;
+    public static final int CMD_SPATIALFX_QUERY = 0x023E;
+    public static final int RESP_SPATIALFX_ACK = 0x813E;
+    public static final int RESP_SPATIALFX = 0x823E;
+
     public static final int MODE_ANC = 0x00;
     public static final int MODE_OFF = 0x01;
     public static final int MODE_TRANS = 0x02;
@@ -75,6 +88,9 @@ public class GaiaClient {
 
         /** 空间音频状态; null 表示耳机未确认/无法解析(指令为实验性) */
         void onSpatial(Boolean state);
+
+        /** DeepX 音效模式(0=标准 1=清澈人声 2=超重低音, 3/4=推断值); null 表示无法解析/未确认 */
+        void onDeepX(Integer mode);
     }
 
     private final List<Listener> listeners = new CopyOnWriteArrayList<Listener>();
@@ -120,6 +136,10 @@ public class GaiaClient {
         for (Listener l : listeners) l.onSpatial(state);
     }
 
+    private void fireDeepX(Integer mode) {
+        for (Listener l : listeners) l.onDeepX(mode);
+    }
+
     /**
      * 空间音频应答解析(实验): 参照开关类 [..][state] 模式(0=关,非0=开),
      * 解析不了就返回 null,原始字节已在 logcat 里留档。
@@ -128,6 +148,17 @@ public class GaiaClient {
         if (p == null || p.length == 0) return null;
         if (p.length == 1) return (p[0] & 0xFF) != 0;
         if ((p[0] & 0xFF) == 0) return (p[p.length - 1] & 0xFF) != 0;
+        return null;
+    }
+
+    /**
+     * DeepX 应答解析: 格式已真机验证为 [00, mode](ACK 0x8118 与查询 0x8218 均是),
+     * payload[0]==0 且长度>=2 时取 payload[1] 为模式,解析不了返回 null,
+     * 原始字节已在 logcat 里留档。
+     */
+    private static Integer parseDeepX(byte[] p) {
+        if (p == null || p.length < 2) return null;
+        if ((p[0] & 0xFF) == 0) return p[1] & 0xFF;
         return null;
     }
 
@@ -176,6 +207,8 @@ public class GaiaClient {
                 sendHandshake();
                 queryBattery();
                 queryNoise();
+                querySpatial();
+                queryDeepX();
                 startReader();
             }
         }, "gaia-connect").start();
@@ -263,6 +296,50 @@ public class GaiaClient {
                 new byte[]{(byte) (on ? 0x01 : 0x00)});
     }
 
+    // ---- DeepX 音效(真机验证) ----
+
+    public void queryDeepX() {
+        boolean v4 = cfg == CFG_FAMILY_V4;
+        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_DEEPX_QUERY,
+                v4 ? new byte[]{0x00} : null);
+    }
+
+    /** DeepX 音效设置: 载荷为单字节 [mode],真实值 0/1/2/3/5(0x04 被官方跳过,悠扬听书=5),
+     *  verb 按 cfg 取, ACK 0x8118 回 [00, mode],与降噪/空间音频同款套路 */
+    public void setDeepX(int mode) {
+        boolean v4 = cfg == CFG_FAMILY_V4;
+        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_DEEPX_SET,
+                new byte[]{(byte) mode});
+    }
+
+    // ---- 空间音效预设(实验,APK 反编译推断) ----
+
+    public void querySpatialFx() {
+        boolean v4 = cfg == CFG_FAMILY_V4;
+        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_SPATIALFX_QUERY,
+                v4 ? new byte[]{0x00} : null);
+    }
+
+    /** 空间音效预设: payload 格式未知,探针轮换候选,每次调用发一种并留日志 */
+    public void setSpatialFx(int preset) {
+        final int[][] probes = {
+                {0x03, preset},             // 0: v3 [preset]
+                {0x03, preset, 0x00},       // 1: v3 [preset 00]
+                {0x04, preset},             // 2: v4 [preset]
+                {0x03, 0x00, preset},       // 3: v3 [00 preset]
+                {0x04, 0x00, preset},       // 4: v4 [00 preset]
+        };
+        int i = spatialFxProbeIdx++ % probes.length;
+        int verb = probes[i][0];
+        byte[] payload = new byte[probes[i].length - 1];
+        for (int k = 1; k < probes[i].length; k++) payload[k - 1] = (byte) probes[i][k];
+        android.util.Log.d("GaiaClient", "sfx probe#" + i + " verb=0x"
+                + Integer.toHexString(verb) + " payload=" + toHex(payload));
+        writeFrame(verb, VENDOR_VIVO, CMD_SPATIALFX_SET, payload);
+    }
+
+    private static int spatialFxProbeIdx = 0;
+
     // ---- 接收 ----
 
     private void startReader() {
@@ -295,6 +372,12 @@ public class GaiaClient {
                                     "spatial cmd=0x" + Integer.toHexString(cmd)
                                             + " payload=" + toHex(payload));
                             fireSpatial(parseSpatial(payload));
+                        } else if (vendor == VENDOR_VIVO
+                                && (cmd == RESP_DEEPX || cmd == RESP_DEEPX_ACK)) {
+                            android.util.Log.d("GaiaClient",
+                                    "deepx cmd=0x" + Integer.toHexString(cmd)
+                                            + " payload=" + toHex(payload));
+                            fireDeepX(parseDeepX(payload));
                         } else if (vendor == VENDOR_VIVO) {
                             // 未知帧全量记录,留作协议分析 ground truth
                             android.util.Log.d("GaiaClient",

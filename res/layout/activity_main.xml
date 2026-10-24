@@ -274,6 +274,42 @@
                 android:text="@string/spatial_caption"
                 android:textColor="#6E6E73"
                 android:textSize="9sp" />
+
+            <!-- DeepX 音效: 三态循环按钮(关/清澈人声/超重低音) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="10dp">
+
+                <TextView
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/deepx_label"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btn_deepx"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:text="--"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/deepx_caption"
+                android:textColor="#6E6E73"
+                android:textSize="9sp" />
         </LinearLayout>
 
         <!-- 免责声明: 常驻最底部 -->
