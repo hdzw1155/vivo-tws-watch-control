@@ -90,11 +90,11 @@ public class TwsTileService extends TileService {
         p.setStyle(Paint.Style.FILL);
         p.setColor(0xFFFFFFFF);
         p.setTextAlign(Paint.Align.CENTER);
-        p.setTextSize(known ? 40f : 44f);
+        p.setTextSize(known ? 50f : 54f);
         p.setFakeBoldText(true);
-        c.drawText(label, 116, 106, p);
-        p.setTextSize(46f);
-        c.drawText(known ? pct + "%" : "--", 116, 158, p);
+        c.drawText(label, 116, 100, p);
+        p.setTextSize(58f);
+        c.drawText(known ? pct + "%" : "--", 116, 164, p);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
@@ -117,8 +117,8 @@ public class TwsTileService extends TileService {
 
         return new LayoutElementBuilders.Column.Builder()
                 .addContent(new LayoutElementBuilders.Box.Builder()
-                        .setWidth(DimensionBuilders.dp(40f))
-                        .setHeight(DimensionBuilders.dp(40f))
+                        .setWidth(DimensionBuilders.dp(38f))
+                        .setHeight(DimensionBuilders.dp(38f))
                         .setModifiers(new ModifiersBuilders.Modifiers.Builder()
                                 .setClickable(new ModifiersBuilders.Clickable.Builder()
                                         .setId("mode_" + target)
@@ -136,14 +136,21 @@ public class TwsTileService extends TileService {
                                 .setBackground(new ModifiersBuilders.Background.Builder()
                                         .setColor(ColorBuilders.argb(bg))
                                         .setCorner(new ModifiersBuilders.Corner.Builder()
-                                                .setRadius(DimensionBuilders.dp(20f))
+                                                .setRadius(DimensionBuilders.dp(19f))
                                                 .build())
                                         .build())
                                 .build())
                         .addContent(new LayoutElementBuilders.Image.Builder()
                                 .setResourceId(resId)
-                                .setWidth(DimensionBuilders.dp(18f))
-                                .setHeight(DimensionBuilders.dp(18f))
+                                .setWidth(DimensionBuilders.dp(16f))
+                                .setHeight(DimensionBuilders.dp(16f))
+                                .build())
+                        .build())
+                .addContent(new LayoutElementBuilders.Text.Builder()
+                        .setText(label)
+                        .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
+                                .setSize(DimensionBuilders.sp(10f))
+                                .setColor(ColorBuilders.argb(active ? 0xFF3478F6 : 0xFF8E8E93))
                                 .build())
                         .build())
                 .build();
@@ -244,21 +251,21 @@ public class TwsTileService extends TileService {
                                                         .build())
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Spacer.Builder()
-                                                .setHeight(DimensionBuilders.dp(8f))
+                                                .setHeight(DimensionBuilders.dp(6f))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Row.Builder()
-                                                .addContent(ringImage("ring_l", 60))
+                                                .addContent(ringImage("ring_l", 56))
                                                 .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                         .setWidth(DimensionBuilders.dp(5f))
                                                         .build())
-                                                .addContent(ringImage("ring_r", 60))
+                                                .addContent(ringImage("ring_r", 56))
                                                 .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                         .setWidth(DimensionBuilders.dp(5f))
                                                         .build())
-                                                .addContent(ringImage("ring_c", 60))
+                                                .addContent(ringImage("ring_c", 56))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Spacer.Builder()
-                                                .setHeight(DimensionBuilders.dp(8f))
+                                                .setHeight(DimensionBuilders.dp(6f))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Row.Builder()
                                                 .addContent(modeButton("ic_off", "关闭", 1, mode == 1))
@@ -272,7 +279,7 @@ public class TwsTileService extends TileService {
                                                 .addContent(modeButton("ic_anc", "降噪", 0, mode == 0))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Spacer.Builder()
-                                                .setHeight(DimensionBuilders.dp(8f))
+                                                .setHeight(DimensionBuilders.dp(6f))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Box.Builder()
                                                 .setWidth(DimensionBuilders.wrap())
