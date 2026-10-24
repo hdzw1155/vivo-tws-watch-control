@@ -117,22 +117,27 @@ public class GaiaClient {
     }
 
     private void fireError(String msg) {
+        if (closing) return;
         for (Listener l : listeners) l.onError(msg);
     }
 
     private void fireBattery(int l, int r, int c, int f) {
+        if (closing) return; // 已被新连接替代,不再回调
         for (Listener li : listeners) li.onBattery(l, r, c, f);
     }
 
     private void fireMode(int mode) {
+        if (closing) return;
         for (Listener l : listeners) l.onNoiseMode(mode);
     }
 
     private void fireSpatial(Boolean state) {
+        if (closing) return;
         for (Listener l : listeners) l.onSpatial(state);
     }
 
     private void fireDeepX(Integer mode) {
+        if (closing) return;
         for (Listener l : listeners) l.onDeepX(mode);
     }
 

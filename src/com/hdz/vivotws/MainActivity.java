@@ -58,6 +58,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private int lastMode = -1;
     private long connectStartAt = 0;
     private Runnable refresher;
+    private Runnable reconnectTask;
     private Switch swSpatial;
     private boolean spatialGuard;
     private long spatialSetAt = 0;
@@ -211,8 +212,12 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     @Override
     protected void onPause() {
         super.onPause();
-        // 手表应用切后台就断开,省电
+        // 手表应用切后台就断开,省电;挂起的重连任务一并取消,别在后台偷连占着耳机
         ui.removeCallbacks(refresher);
+        if (reconnectTask != null) {
+            ui.removeCallbacks(reconnectTask);
+            reconnectTask = null;
+        }
         if (client != null) {
             client.disconnect();
             client = null;
@@ -521,16 +526,19 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                 sub.setText("");
             }
         });
-        // 耳机开关机/走远断连后,3 秒后自动试着连回来
+        // 耳机开关机/走远断连后,3 秒后自动试着连回来(存引用,切后台时取消)
         if (!isFinishing() && !isDestroyed()) {
-            ui.postDelayed(new Runnable() {
+            if (reconnectTask != null) ui.removeCallbacks(reconnectTask);
+            reconnectTask = new Runnable() {
                 @Override public void run() {
+                    reconnectTask = null;
                     if (!isFinishing() && !isDestroyed()
                             && (client == null || !client.isConnected())) {
                         tryConnect();
                     }
                 }
-            }, 3000);
+            };
+            ui.postDelayed(reconnectTask, 3000);
         }
     }
 
