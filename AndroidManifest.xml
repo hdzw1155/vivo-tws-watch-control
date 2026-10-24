@@ -35,35 +35,8 @@
                 android:resource="@mipmap/ic_launcher" />
         </service>
 
-        <service
-            android:name=".BatteryTileService"
-            android:exported="true"
-            android:label="耳机电量"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
-            <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
-            </intent-filter>
-        </service>
 
-        <service
-            android:name=".ModeTileService"
-            android:exported="true"
-            android:label="降噪状态"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
-            <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
-            </intent-filter>
-        </service>
 
-        <service
-            android:name=".TwoRowTileService"
-            android:exported="true"
-            android:label="电量与降噪"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
-            <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
-            </intent-filter>
-        </service>
 
         <activity
             android:name=".ModeCyclerActivity"

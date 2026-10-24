@@ -68,9 +68,6 @@ public class ModeCyclerActivity extends Activity implements GaiaClient.Listener 
         // 让系统立刻重画磁贴, 不等刷新周期
         try {
             TileService.getUpdater(this).requestUpdate(TwsTileService.class);
-            TileService.getUpdater(this).requestUpdate(BatteryTileService.class);
-            TileService.getUpdater(this).requestUpdate(ModeTileService.class);
-            TileService.getUpdater(this).requestUpdate(TwoRowTileService.class);
         } catch (Exception ignored) {
         }
         complete();

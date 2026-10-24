@@ -437,9 +437,6 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private void refreshTiles() {
         try {
             TileService.getUpdater(this).requestUpdate(TwsTileService.class);
-            TileService.getUpdater(this).requestUpdate(BatteryTileService.class);
-            TileService.getUpdater(this).requestUpdate(ModeTileService.class);
-            TileService.getUpdater(this).requestUpdate(TwoRowTileService.class);
         } catch (Exception ignored) {
         }
     }
