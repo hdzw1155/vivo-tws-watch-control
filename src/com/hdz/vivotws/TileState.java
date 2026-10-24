@@ -16,8 +16,8 @@ final class TileState {
     private TileState() {
     }
 
-    /** 实时状态文字: 先查真实 ACL 连接(最准), 再查 GATT 列表,
-     *  都拿不到才用 90 秒内的成功记录兜底(太久就是谎报"已连接") */
+    /** 实时状态: App 的断连回调已写"未连接"时直接信它(蓝牙 ACL 常滞后,反射会撒谎),
+     *  否则查真实 ACL/GATT,再不行用 20 秒内的成功记录兜底 */
     static String liveStatus(Context ctx) {
         BluetoothManager bm =
                 (BluetoothManager) ctx.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -40,8 +40,12 @@ final class TileState {
         List<BluetoothDevice> connected = bm.getConnectedDevices(BluetoothProfile.GATT);
         if (findEarbudIn(connected)) return "已连接";
 
+        // 蓝牙层已无连接: 若 App 的断连回调也报了断开(且超过 20 秒没有成功记录),别再装连着
         long lastOk = cfg.getLong("tile_last_ok", 0);
-        if (System.currentTimeMillis() - lastOk < 90 * 1000L) return "已连接";
+        if ("未连接".equals(cfg.getString("tile_status", null))
+                && System.currentTimeMillis() - lastOk > 20 * 1000L) return "未连接";
+        // 刚断开不到 20 秒, 给耳机一点回连时间, 显示保持乐观
+        if (System.currentTimeMillis() - lastOk < 20 * 1000L) return "已连接";
         return "未连接";
     }
 

@@ -235,6 +235,9 @@ public class TwsTileService extends TileService {
         int[] s = snapshot(this);
         int mode = s[4];
         String status = TileState.liveStatus(this);
+        // 诊断: 系统来要磁贴时,把我们算出的状态打到日志,验证"没重画"还是"算错"
+        android.util.Log.d("TileSvc", "onTileRequest status=" + status
+                + " conn=" + s[0] + " batt=" + s[1] + "/" + s[2] + "/" + s[3]);
         SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
         String name = cfg.getString("tile_name", "vivo TWS Air 3 Pro");
 
@@ -340,11 +343,6 @@ public class TwsTileService extends TileService {
                 .setFreshnessIntervalMillis(REFRESH_MS)
                 .setTimeline(new TimelineBuilders.Timeline.Builder()
                         .addTimelineEntry(new TimelineBuilders.TimelineEntry.Builder()
-                                // 15 秒有效期: 过期系统必须重新请求,断开/电量变化别装傻
-                                .setValidity(new TimelineBuilders.TimeInterval.Builder()
-                                        .setStartMillis(now)
-                                        .setEndMillis(now + REFRESH_MS)
-                                        .build())
                                 .setLayout(layout)
                                 .build())
                         .build())
