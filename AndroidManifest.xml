@@ -45,5 +45,9 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <service
+            android:name=".ModeCyclerService"
+            android:exported="false" />
     </application>
 </manifest>

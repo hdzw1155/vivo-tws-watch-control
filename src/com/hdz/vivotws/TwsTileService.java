@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 /** 整页磁贴: 已连接/未连接 + 耳机名 + 三个电量环(左/右/盒) + 降噪圆钮 + 打开控制 */
 public class TwsTileService extends TileService {
 
-    private static final long REFRESH_MS = 2 * 60 * 1000;
+    private static final long REFRESH_MS = 15 * 1000; // 可见时勤刷,断开状态别装傻
     private static final String[] EARS = {"左", "右", "盒"};
 
     private static final class DoneFuture implements ListenableFuture<Object> {
