@@ -66,12 +66,12 @@ echo [4/6] d8 dex...
 pushd build\classes
 jar cf ..\classes.jar com || exit /b 1
 popd
-rem d8 的 --lib 不接受分号串,逐个 jar 传
+rem 库 jar 必须作为输入一起进 dex(--lib 只用于解析引用,不会打包)
 setlocal enabledelayedexpansion
-set D8LIBS=--lib "%PLAT%"
-for %%j in ("%LIBS%\*.jar") do set "D8LIBS=!D8LIBS! --lib "%%j""
-call "%BT%\d8.bat" --release !D8LIBS! --min-api 30 ^
-  --output build build\classes.jar || exit /b 1
+set D8IN=build\classes.jar
+for %%j in ("%LIBS%\*.jar") do set "D8IN=!D8IN! "%%j""
+call "%BT%\d8.bat" --release --lib "%PLAT%" --min-api 30 ^
+  --output build !D8IN! || exit /b 1
 endlocal
 
 echo [5/6] 打包 dex...

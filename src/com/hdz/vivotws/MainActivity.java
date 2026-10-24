@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -13,6 +14,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
+import androidx.wear.tiles.TileService;
 import android.os.SystemClock;
 import android.view.View;
 import android.widget.Button;
@@ -409,18 +411,34 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         setBatt(pctL, barL, left, (chargeFlags & 0x01) != 0);
         setBatt(pctR, barR, right, (chargeFlags & 0x02) != 0);
         setBatt(pctC, barC, box, (chargeFlags & 0x04) != 0);
-        // 给系统磁贴留快照(磁贴每 5 分钟读一次)
-        getSharedPreferences("cfg", MODE_PRIVATE).edit()
+        // 给系统磁贴留快照(磁贴每 2 分钟读一次)
+        SharedPreferences tileCfg = getSharedPreferences("cfg", MODE_PRIVATE);
+        tileCfg.edit()
                 .putString("tile_batt",
                         fmtBatt("左", left) + "  " + fmtBatt("右", right)
                                 + "  盒 " + fmtBatt("盒", box)
                                 + (((chargeFlags & 0x07) != 0) ? " ⚡" : ""))
+                .putInt("tile_batt_l", left)
+                .putInt("tile_batt_r", right)
+                .putInt("tile_batt_c", box)
                 .apply();
+        refreshTiles();
     }
 
     private static String fmtBatt(String label, int v) {
         if (v < 0 || v > 100) return label + " --";
         return label + " " + v + "%";
+    }
+
+    /** 数据变了就叫系统立刻重画磁贴,不等 2 分钟的刷新周期 */
+    private void refreshTiles() {
+        try {
+            TileService.getUpdater(this).requestUpdate(TwsTileService.class);
+            TileService.getUpdater(this).requestUpdate(BatteryTileService.class);
+            TileService.getUpdater(this).requestUpdate(ModeTileService.class);
+            TileService.getUpdater(this).requestUpdate(TwoRowTileService.class);
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -435,6 +453,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                             new String[]{"降噪开", "降噪关", "通透"}[mode])
                     .apply();
         }
+        refreshTiles();
     }
 
     @Override

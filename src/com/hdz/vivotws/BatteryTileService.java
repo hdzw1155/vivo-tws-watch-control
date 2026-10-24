@@ -3,13 +3,11 @@ package com.hdz.vivotws;
 import androidx.wear.tiles.ColorBuilders;
 import androidx.wear.tiles.DimensionBuilders;
 import androidx.wear.tiles.LayoutElementBuilders;
-import androidx.wear.tiles.ModifiersBuilders;
 import androidx.wear.tiles.RequestBuilders;
 import androidx.wear.tiles.ResourceBuilders;
 import androidx.wear.tiles.TileBuilders;
 import androidx.wear.tiles.TileService;
 import androidx.wear.tiles.TimelineBuilders;
-import androidx.wear.tiles.TypeBuilders;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -19,10 +17,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
-/** 极简磁贴: 只显示左右耳和充电盒电量, 每 5 分钟刷新 */
+/** 一行磁贴: 三个电量圆环(左/右/盒), 环内百分比, 环下标签 */
 public class BatteryTileService extends TileService {
 
-    private static final long REFRESH_MS = 5 * 60 * 1000;
+    private static final long REFRESH_MS = 2 * 60 * 1000;
 
     private static final class DoneFuture implements ListenableFuture<Object> {
         private final Object value;
@@ -56,9 +54,43 @@ public class BatteryTileService extends TileService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static <T> ListenableFuture<T> done(T value) {
         return (ListenableFuture<T>) (ListenableFuture<?>) new DoneFuture(value);
+    }
+
+    /** 单个圆环: 灰色轨道 + 绿色进度 + 中心百分比 + 环下标签 */
+    private LayoutElementBuilders.LayoutElement ring(String label, int pct) {
+        boolean known = pct >= 0 && pct <= 100;
+        float deg = known ? pct * 3.6f : 0f;
+        String num = known ? String.valueOf(pct) : "--";
+
+        LayoutElementBuilders.Arc arc = new LayoutElementBuilders.Arc.Builder()
+                .addContent(new LayoutElementBuilders.ArcLine.Builder()
+                        .setLength(DimensionBuilders.degrees(360f))
+                        .setThickness(DimensionBuilders.dp(5f))
+                        .setColor(ColorBuilders.argb(0xFF3A3A3C))
+                        .build())
+                .addContent(new LayoutElementBuilders.ArcLine.Builder()
+                        .setLength(DimensionBuilders.degrees(deg))
+                        .setThickness(DimensionBuilders.dp(5f))
+                        .setColor(ColorBuilders.argb(known ? 0xFF34C759 : 0xFF3A3A3C))
+                        .build())
+                .build();
+
+        return new LayoutElementBuilders.Column.Builder()
+                .addContent(new LayoutElementBuilders.Box.Builder()
+                        .setWidth(DimensionBuilders.dp(54f))
+                        .setHeight(DimensionBuilders.dp(54f))
+                        .addContent(arc)
+                        .build())
+                .addContent(new LayoutElementBuilders.Text.Builder()
+                        .setText(label)
+                        .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
+                                .setSize(DimensionBuilders.sp(9f))
+                                .setColor(ColorBuilders.argb(0xFF8E8E93))
+                                .build())
+                        .build())
+                .build();
     }
 
     @Override
@@ -71,8 +103,9 @@ public class BatteryTileService extends TileService {
     public ListenableFuture<TileBuilders.Tile> onTileRequest(
             RequestBuilders.TileRequest requestParams) {
         SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
-        String batt = cfg.getString("tile_batt", "左 --  右 --  盒 --");
-        String status = cfg.getString("tile_status", "未连接");
+        int l = cfg.getInt("tile_batt_l", -1);
+        int r = cfg.getInt("tile_batt_r", -1);
+        int c = cfg.getInt("tile_batt_c", -1);
 
         LayoutElementBuilders.Layout layout =
                 new LayoutElementBuilders.Layout.Builder()
@@ -83,32 +116,16 @@ public class BatteryTileService extends TileService {
                                         LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
                                 .setVerticalAlignment(
                                         LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-                                .addContent(new LayoutElementBuilders.Column.Builder()
-                                        .setWidth(DimensionBuilders.expand())
-                                        .addContent(new LayoutElementBuilders.Text.Builder()
-                                                .setText(status)
-                                                .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
-                                                        .setSize(DimensionBuilders.sp(12f))
-                                                        .setColor(ColorBuilders.argb(0xFF8E8E93))
-                                                        .build())
-                                                .build())
+                                .addContent(new LayoutElementBuilders.Row.Builder()
+                                        .addContent(ring("左", l))
                                         .addContent(new LayoutElementBuilders.Spacer.Builder()
-                                                .setHeight(DimensionBuilders.dp(10f))
+                                                .setWidth(DimensionBuilders.dp(6f))
                                                 .build())
-                                        .addContent(new LayoutElementBuilders.Text.Builder()
-                                                .setText(batt)
-                                                .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
-                                                        .setSize(DimensionBuilders.sp(15f))
-                                                        .setColor(ColorBuilders.argb(0xFFFFFFFF))
-                                                        .setWeight(700)
-                                                        .build())
-                                                .setModifiers(new ModifiersBuilders.Modifiers.Builder()
-                                                        .setPadding(new ModifiersBuilders.Padding.Builder()
-                                                                .setStart(DimensionBuilders.dp(6f))
-                                                                .setEnd(DimensionBuilders.dp(6f))
-                                                                .build())
-                                                        .build())
+                                        .addContent(ring("右", r))
+                                        .addContent(new LayoutElementBuilders.Spacer.Builder()
+                                                .setWidth(DimensionBuilders.dp(6f))
                                                 .build())
+                                        .addContent(ring("盒", c))
                                         .build())
                                 .build())
                         .build();
