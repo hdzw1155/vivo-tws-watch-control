@@ -11,12 +11,12 @@
     <string name="dev_section">开发者设置</string>
     <string name="dev_unlocked_toast">开发者设置已开启</string>
     <string name="spatial_switch">空间音频</string>
-    <string name="spatial_caption">实验功能，作者感觉无效；仅限 vivo TWS Air 3 Pro；切换前请调低音量</string>
-    <string name="spatial_toast">实验功能：音效可能突变，请留意音量</string>
+    <string name="spatial_caption">实验功能，作者感觉无效；仅限 vivo TWS Air 3 Pro；调试时请摘下耳机、调低音量</string>
+    <string name="spatial_toast">实验功能：请摘下耳机调试，音效可能突变</string>
     <string name="spatial_dialog_title">实验性功能</string>
-    <string name="spatial_dialog_msg">空间音频为实验性功能，作者感觉无效：仅限 vivo TWS Air 3 Pro 适配，指令来自社区逆向协议、未获官方认证，未来固件更新后可能失效；切换瞬间音效可能突变，请先调低播放音量。是否继续启用？</string>
+    <string name="spatial_dialog_msg">空间音频为实验性功能，作者感觉无效：仅限 vivo TWS Air 3 Pro 适配，指令来自社区逆向协议、未获官方认证，未来固件更新后可能失效；切换瞬间音效可能突变，调试前请先摘下耳机并将音量调至最低。是否继续启用？</string>
     <string name="deepx_label">DeepX 音效</string>
-    <string name="deepx_caption">因不明原因，点击后请等待几秒生效；目前仅适配 vivo TWS Air 3 Pro；请不要连续切换，功能可能会失效</string>
+    <string name="deepx_caption">因不明原因，点击后请等待几秒生效；目前仅适配 vivo TWS Air 3 Pro；调试时请先摘下耳机、调低音量，请不要连续切换，功能可能会失效</string>
     <string name="dialog_ok">已了解风险，继续</string>
     <string name="dialog_cancel">取消</string>
     <string name="global_disclaimer_title">免责声明</string>
