@@ -13,6 +13,7 @@ import androidx.wear.tiles.TimelineBuilders;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -156,16 +157,32 @@ public class TwsTileService extends TileService {
                 .build();
     }
 
+    /** 磁贴数据快照: {是否连着, 左, 右, 盒, 模式}; 断开时电量一律 -1(显示 --) */
+    private static int[] snapshot(Context ctx) {
+        SharedPreferences cfg = ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE);
+        boolean on = TileState.liveStatus(ctx).equals("已连接");
+        return new int[]{
+                on ? 1 : 0,
+                on ? cfg.getInt("tile_batt_l", -1) : -1,
+                on ? cfg.getInt("tile_batt_r", -1) : -1,
+                on ? cfg.getInt("tile_batt_c", -1) : -1,
+                cfg.getInt("tile_mode", 1),
+        };
+    }
+
+    /** 资源版本号: 随数据变化而变化, 否则系统拿缓存的旧电量环图永远不重画 */
+    private static String resVersion(int[] s) {
+        return s[0] + "_" + s[1] + "_" + s[2] + "_" + s[3];
+    }
+
     @Override
     public ListenableFuture<ResourceBuilders.Resources> onResourcesRequest(
             RequestBuilders.ResourcesRequest requestParams) {
-        SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
-        int l = cfg.getInt("tile_batt_l", -1);
-        int r = cfg.getInt("tile_batt_r", -1);
-        int c = cfg.getInt("tile_batt_c", -1);
+        int[] s = snapshot(this);
+        int l = s[1], r = s[2], c = s[3];
 
         ResourceBuilders.Resources res = new ResourceBuilders.Resources.Builder()
-                .setVersion("1")
+                .setVersion(resVersion(s))
                 .addIdToImageMapping("ring_l",
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
@@ -215,13 +232,11 @@ public class TwsTileService extends TileService {
     @Override
     public ListenableFuture<TileBuilders.Tile> onTileRequest(
             RequestBuilders.TileRequest requestParams) {
-        SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
-        int mode = cfg.getInt("tile_mode", 1);
+        int[] s = snapshot(this);
+        int mode = s[4];
         String status = TileState.liveStatus(this);
+        SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
         String name = cfg.getString("tile_name", "vivo TWS Air 3 Pro");
-        int l = cfg.getInt("tile_batt_l", -1);
-        int r = cfg.getInt("tile_batt_r", -1);
-        int c = cfg.getInt("tile_batt_c", -1);
 
         LayoutElementBuilders.Layout layout =
                 new LayoutElementBuilders.Layout.Builder()
@@ -319,11 +334,17 @@ public class TwsTileService extends TileService {
                                 .build())
                         .build();
 
+        long now = System.currentTimeMillis();
         return done(new TileBuilders.Tile.Builder()
-                .setResourcesVersion("1")
+                .setResourcesVersion(resVersion(s))
                 .setFreshnessIntervalMillis(REFRESH_MS)
                 .setTimeline(new TimelineBuilders.Timeline.Builder()
                         .addTimelineEntry(new TimelineBuilders.TimelineEntry.Builder()
+                                // 15 秒有效期: 过期系统必须重新请求,断开/电量变化别装傻
+                                .setValidity(new TimelineBuilders.TimeInterval.Builder()
+                                        .setStartMillis(now)
+                                        .setEndMillis(now + REFRESH_MS)
+                                        .build())
                                 .setLayout(layout)
                                 .build())
                         .build())
