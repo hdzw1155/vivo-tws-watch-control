@@ -1,10 +1,12 @@
 package com.hdz.vivotws;
 
+import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.SharedPreferences;
+import android.os.Build;
 import androidx.wear.tiles.TileService;
 import android.os.Bundle;
 import android.os.Handler;
@@ -25,6 +27,13 @@ public class ModeCyclerActivity extends Activity implements GaiaClient.Listener 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // 没授权就点磁贴按钮会因 getBondedDevices 抛 SecurityException 闪退,先拦住
+        if (Build.VERSION.SDK_INT >= 31
+                && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            finish();
+            return;
+        }
         SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
         int last = cfg.getInt("tile_mode", GaiaClient.MODE_OFF);
         // 磁贴上传来的指定档位(点谁切谁); 没传就循环下一档

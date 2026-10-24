@@ -16,7 +16,8 @@ final class TileState {
     private TileState() {
     }
 
-    /** 实时状态文字: 优先用 MAC+反射查 ACL 连接(最准), 退化到 GATT 列表 */
+    /** 实时状态文字: 先查真实 ACL 连接(最准), 再查 GATT 列表,
+     *  都拿不到才用 90 秒内的成功记录兜底(太久就是谎报"已连接") */
     static String liveStatus(Context ctx) {
         BluetoothManager bm =
                 (BluetoothManager) ctx.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -25,8 +26,6 @@ final class TileState {
         if (adapter == null || !adapter.isEnabled()) return "蓝牙关";
 
         SharedPreferences cfg = ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE);
-        long lastOk = cfg.getLong("tile_last_ok", 0);
-        if (System.currentTimeMillis() - lastOk < 30 * 60 * 1000L) return "已连接";
         String mac = cfg.getString("tile_mac", null);
         if (mac != null) {
             try {
@@ -39,7 +38,11 @@ final class TileState {
             }
         }
         List<BluetoothDevice> connected = bm.getConnectedDevices(BluetoothProfile.GATT);
-        return findEarbudIn(connected) ? "已连接" : "未连接";
+        if (findEarbudIn(connected)) return "已连接";
+
+        long lastOk = cfg.getLong("tile_last_ok", 0);
+        if (System.currentTimeMillis() - lastOk < 90 * 1000L) return "已连接";
+        return "未连接";
     }
 
     /** 在已连接 GATT 设备里找 vivo/iQOO 耳机 */
