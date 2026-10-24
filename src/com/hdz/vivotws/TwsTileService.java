@@ -65,34 +65,31 @@ public class TwsTileService extends TileService {
         return (ListenableFuture<T>) (ListenableFuture<?>) new DoneFuture(value);
     }
 
-    /** 运行时画一个电量环: 深色底 + 灰轨道 + 绿进度 + 环内"标签+百分比"两行字 */
-    private byte[] renderRing(String label, int pct) {
+    /** 运行时画一个纯电量环(不含文字): 深色底 + 灰轨道 + 绿进度, 文字交给系统渲染 */
+    private static String fmtBatt(String label, int v) {
+        if (v < 0 || v > 100) return label + " --";
+        return label + " " + v + "%";
+    }
+
+    private byte[] renderRing(int pct) {
         boolean known = pct >= 0 && pct <= 100;
-        Bitmap bmp = Bitmap.createBitmap(372, 372, Bitmap.Config.ARGB_8888);
+        Bitmap bmp = Bitmap.createBitmap(240, 240, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(bmp);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         p.setStyle(Paint.Style.FILL);
         p.setColor(0xFF1C1C1E);
-        c.drawCircle(186, 186, 170, p);
+        c.drawCircle(120, 120, 114, p);
 
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(25f);
+        p.setStrokeWidth(16f);
         p.setColor(0xFF3A3A3C);
-        c.drawCircle(186, 186, 148, p);
+        c.drawCircle(120, 120, 106, p);
 
         if (known) {
             p.setColor(0xFF30D158);
-            c.drawArc(42, 42, 330, 330, -90, 360f * pct / 100f, false, p);
+            c.drawArc(16, 16, 224, 224, -90, 360f * pct / 100f, false, p);
         }
-
-        p.setColor(0xFFFFFFFF);
-        p.setTextAlign(Paint.Align.CENTER);
-        p.setTextSize(known ? 108f : 120f);
-        p.setFakeBoldText(true);
-        c.drawText(label, 186, 176, p);
-        p.setTextSize(130f);
-        c.drawText(known ? pct + "%" : "--", 186, 264, p);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
@@ -167,27 +164,27 @@ public class TwsTileService extends TileService {
                 .addIdToImageMapping("ring_l",
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
-                                        .setData(renderRing(EARS[0], l))
-                                        .setWidthPx(124)
-                                        .setHeightPx(124)
+                                        .setData(renderRing(l))
+                                        .setWidthPx(240)
+                                        .setHeightPx(240)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
                 .addIdToImageMapping("ring_r",
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
-                                        .setData(renderRing(EARS[1], r))
-                                        .setWidthPx(124)
-                                        .setHeightPx(124)
+                                        .setData(renderRing(r))
+                                        .setWidthPx(240)
+                                        .setHeightPx(240)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
                 .addIdToImageMapping("ring_c",
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
-                                        .setData(renderRing(EARS[2], c))
-                                        .setWidthPx(124)
-                                        .setHeightPx(124)
+                                        .setData(renderRing(c))
+                                        .setWidthPx(240)
+                                        .setHeightPx(240)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
@@ -217,6 +214,11 @@ public class TwsTileService extends TileService {
         int mode = cfg.getInt("tile_mode", 1);
         String status = TileState.liveStatus(this);
         String name = cfg.getString("tile_name", "vivo TWS Air 3 Pro");
+        int l = cfg.getInt("tile_batt_l", -1);
+        int r = cfg.getInt("tile_batt_r", -1);
+        int c = cfg.getInt("tile_batt_c", -1);
+        String battLine = fmtBatt("左", l) + " · " + fmtBatt("右", r)
+                + " · " + fmtBatt("盒", c);
 
         LayoutElementBuilders.Layout layout =
                 new LayoutElementBuilders.Layout.Builder()
@@ -233,14 +235,14 @@ public class TwsTileService extends TileService {
                                         .addContent(new LayoutElementBuilders.Text.Builder()
                                                 .setText(status)
                                                 .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
-                                                        .setSize(DimensionBuilders.sp(13f))
+                                                        .setSize(DimensionBuilders.sp(12f))
                                                         .setColor(ColorBuilders.argb(0xFF9BE29B))
                                                         .build())
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Text.Builder()
                                                 .setText(name)
                                                 .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
-                                                        .setSize(DimensionBuilders.sp(15f))
+                                                        .setSize(DimensionBuilders.sp(14f))
                                                         .setColor(ColorBuilders.argb(0xFFFFFFFF))
                                                         .setWeight(700)
                                                         .build())
@@ -249,15 +251,27 @@ public class TwsTileService extends TileService {
                                                 .setHeight(DimensionBuilders.dp(8f))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Row.Builder()
-                                                .addContent(ringImage("ring_l", 62))
+                                                .addContent(ringImage("ring_l", 48))
                                                 .addContent(new LayoutElementBuilders.Spacer.Builder()
-                                                        .setWidth(DimensionBuilders.dp(6f))
+                                                        .setWidth(DimensionBuilders.dp(5f))
                                                         .build())
-                                                .addContent(ringImage("ring_r", 62))
+                                                .addContent(ringImage("ring_r", 48))
                                                 .addContent(new LayoutElementBuilders.Spacer.Builder()
-                                                        .setWidth(DimensionBuilders.dp(6f))
+                                                        .setWidth(DimensionBuilders.dp(5f))
                                                         .build())
-                                                .addContent(ringImage("ring_c", 62))
+                                                .addContent(ringImage("ring_c", 48))
+                                                .build())
+                                        .addContent(new LayoutElementBuilders.Text.Builder()
+                                                .setText(battLine)
+                                                .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
+                                                        .setSize(DimensionBuilders.sp(11f))
+                                                        .setColor(ColorBuilders.argb(0xFFFFFFFF))
+                                                        .build())
+                                                .setModifiers(new ModifiersBuilders.Modifiers.Builder()
+                                                        .setPadding(new ModifiersBuilders.Padding.Builder()
+                                                                .setTop(DimensionBuilders.dp(4f))
+                                                                .build())
+                                                        .build())
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                 .setHeight(DimensionBuilders.dp(8f))
@@ -274,7 +288,7 @@ public class TwsTileService extends TileService {
                                                 .addContent(modeButton("ic_anc", "降噪", 0, mode == 0))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Spacer.Builder()
-                                                .setHeight(DimensionBuilders.dp(6f))
+                                                .setHeight(DimensionBuilders.dp(8f))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Box.Builder()
                                                 .setWidth(DimensionBuilders.wrap())
