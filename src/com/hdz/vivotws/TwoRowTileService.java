@@ -106,6 +106,7 @@ public class TwoRowTileService extends TileService {
                                 .setBottom(DimensionBuilders.dp(9f))
                                 .build())
                         .setClickable(new ModifiersBuilders.Clickable.Builder()
+                                .setId("tap")
                                 .setOnClick(new ActionBuilders.LaunchAction.Builder()
                                         .setAndroidActivity(new ActionBuilders.AndroidActivity.Builder()
                                                 .setClassName("com.hdz.vivotws.ModeCyclerActivity")

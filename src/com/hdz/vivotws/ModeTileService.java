@@ -85,6 +85,7 @@ public class ModeTileService extends TileService {
                                         .setBottom(DimensionBuilders.dp(10f))
                                         .build())
                                 .setClickable(new ModifiersBuilders.Clickable.Builder()
+                                        .setId("tap")
                                         .setOnClick(new ActionBuilders.LaunchAction.Builder()
                                                 .setAndroidActivity(new ActionBuilders.AndroidActivity.Builder()
                                                         .setClassName("com.hdz.vivotws.ModeCyclerActivity")

@@ -1,30 +1,43 @@
 package com.hdz.vivotws;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
+import android.content.SharedPreferences;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
-/** 磁贴共用的状态探测: 通过系统 GATT 连接列表判断耳机是否真的挂在手表上 */
+/** 磁贴共用的状态探测: 判断耳机是否真的挂在手表系统上 */
 final class TileState {
 
     private TileState() {
     }
 
-    /** 耳机是否已连接到手表系统(不依赖 App 是否在前台) */
-    static boolean earbudsLinked(Context ctx) {
+    /** 实时状态文字: 优先用 MAC+反射查 ACL 连接(最准), 退化到 GATT 列表 */
+    static String liveStatus(Context ctx) {
         BluetoothManager bm =
                 (BluetoothManager) ctx.getSystemService(Context.BLUETOOTH_SERVICE);
-        if (bm == null) return false;
-        List<BluetoothDevice> connected = bm.getConnectedDevices(BluetoothProfile.GATT);
-        return findEarbudIn(connected);
-    }
+        if (bm == null) return "未连接";
+        BluetoothAdapter adapter = bm.getAdapter();
+        if (adapter == null || !adapter.isEnabled()) return "蓝牙关";
 
-    /** 实时状态文字(磁贴直接显示用) */
-    static String liveStatus(Context ctx) {
-        return earbudsLinked(ctx) ? "已连接" : "未连接";
+        SharedPreferences cfg = ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE);
+        String mac = cfg.getString("tile_mac", null);
+        if (mac != null) {
+            try {
+                BluetoothDevice d = adapter.getRemoteDevice(mac);
+                Method m = d.getClass().getMethod("isConnected");
+                Object r = m.invoke(d);
+                if (r instanceof Boolean && (Boolean) r) return "已连接";
+            } catch (Exception ignored) {
+                // 反射失败走下面的 GATT 查询
+            }
+        }
+        List<BluetoothDevice> connected = bm.getConnectedDevices(BluetoothProfile.GATT);
+        return findEarbudIn(connected) ? "已连接" : "未连接";
     }
 
     /** 在已连接 GATT 设备里找 vivo/iQOO 耳机 */

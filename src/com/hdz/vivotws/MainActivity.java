@@ -339,6 +339,9 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         status.setText(R.string.status_connecting);
         sub.setTextColor(COL_LABEL_GRAY);
         sub.setText(target.getName());
+        // 记下 MAC 给磁贴做实时连接状态判断
+        getSharedPreferences("cfg", MODE_PRIVATE).edit()
+                .putString("tile_mac", target.getAddress()).apply();
         client = new GaiaClient(this);
         connectStartAt = SystemClock.elapsedRealtime();
         client.connect(target);
