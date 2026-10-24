@@ -1,6 +1,5 @@
 # vivo TWS Watch Control
 
-> 🚧 **本项目已停止新功能开发，仅维护现状**。全新多品牌版本（vivo / 华为 / 小米 …）请移步：**[tws-control-for-wear](https://github.com/hdzw1155/tws-control-for-wear)**。已安装本应用的用户可继续使用，两个应用互不影响。
 
 在 **Wear OS 手表**上直接控制 **vivo / iQOO TWS 耳机**的降噪模式与电量查询——不依赖手机，手表通过经典蓝牙 RFCOMM 直连耳机发送 vivo 私有 GAIA 指令。耳机可同时保持与手机的音频连接（双设备连接）。
 
