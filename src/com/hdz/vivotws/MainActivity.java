@@ -237,7 +237,8 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                 .show();
     }
 
-    /** 首次启动的全局免责确认框,同意后记住(disclaimer_ack) */
+    /** 全局免责确认框: 同意后记录"同意时的版本号",
+     *  升级新版本或卸载重装会重新弹出,同一版本连续使用不再打扰 */
     private void showDisclaimerDialog() {
         if (disclaimerDialogUp) return;
         disclaimerDialogUp = true;
@@ -248,7 +249,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                 .setPositiveButton(R.string.dialog_agree, new android.content.DialogInterface.OnClickListener() {
                     @Override public void onClick(android.content.DialogInterface d, int w) {
                         getSharedPreferences("cfg", MODE_PRIVATE).edit()
-                                .putBoolean("disclaimer_ack", true).apply();
+                                .putInt("disclaimer_ack_ver", currentVersionCode()).apply();
                         disclaimerOk = true;
                         disclaimerDialogUp = false;
                         tryConnect();
@@ -261,6 +262,14 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                     }
                 })
                 .show();
+    }
+
+    private int currentVersionCode() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+        } catch (Exception e) {
+            return -1;
+        }
     }
 
     private boolean hasPerm() {
@@ -293,9 +302,9 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     }
 
     private void tryConnect() {
-        // 首次使用先过全局免责确认(记住后不再弹),侧载用户也能看到
-        if (!disclaimerOk && !getSharedPreferences("cfg", MODE_PRIVATE)
-                .getBoolean("disclaimer_ack", false)) {
+        // 全局免责确认: 每个新版本首次使用都要重新同意,同版本连续使用不再弹
+        if (!disclaimerOk && getSharedPreferences("cfg", MODE_PRIVATE)
+                .getInt("disclaimer_ack_ver", -1) != currentVersionCode()) {
             showDisclaimerDialog();
             return;
         }
