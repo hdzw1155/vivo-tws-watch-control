@@ -157,29 +157,29 @@ public class TwsTileService extends TileService {
                 .build();
     }
 
-    /** 磁贴数据快照: {是否连着, 左, 右, 盒, 模式}; 断开时电量一律 -1(显示 --) */
+    /** 磁贴数据快照: {左, 右, 盒, 模式}
+     *  电量永远显示最近一次查询到的值(0.3.3~0.3.5 曾按连接状态把电量强制归 --,
+     *  配合状态判断的抖动造成显示来回跳,比 0.3.2 还差,已回退); 状态文字单独算 */
     private static int[] snapshot(Context ctx) {
         SharedPreferences cfg = ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE);
-        boolean on = TileState.liveStatus(ctx).equals("已连接");
         return new int[]{
-                on ? 1 : 0,
-                on ? cfg.getInt("tile_batt_l", -1) : -1,
-                on ? cfg.getInt("tile_batt_r", -1) : -1,
-                on ? cfg.getInt("tile_batt_c", -1) : -1,
+                cfg.getInt("tile_batt_l", -1),
+                cfg.getInt("tile_batt_r", -1),
+                cfg.getInt("tile_batt_c", -1),
                 cfg.getInt("tile_mode", 1),
         };
     }
 
     /** 资源版本号: 随数据变化而变化, 否则系统拿缓存的旧电量环图永远不重画 */
     private static String resVersion(int[] s) {
-        return s[0] + "_" + s[1] + "_" + s[2] + "_" + s[3];
+        return s[0] + "_" + s[1] + "_" + s[2];
     }
 
     @Override
     public ListenableFuture<ResourceBuilders.Resources> onResourcesRequest(
             RequestBuilders.ResourcesRequest requestParams) {
         int[] s = snapshot(this);
-        int l = s[1], r = s[2], c = s[3];
+        int l = s[0], r = s[1], c = s[2];
 
         ResourceBuilders.Resources res = new ResourceBuilders.Resources.Builder()
                 .setVersion(resVersion(s))
@@ -233,11 +233,11 @@ public class TwsTileService extends TileService {
     public ListenableFuture<TileBuilders.Tile> onTileRequest(
             RequestBuilders.TileRequest requestParams) {
         int[] s = snapshot(this);
-        int mode = s[4];
+        int mode = s[3];
         String status = TileState.liveStatus(this);
         // 诊断: 系统来要磁贴时,把我们算出的状态打到日志,验证"没重画"还是"算错"
         android.util.Log.d("TileSvc", "onTileRequest status=" + status
-                + " conn=" + s[0] + " batt=" + s[1] + "/" + s[2] + "/" + s[3]);
+                + " batt=" + s[0] + "/" + s[1] + "/" + s[2]);
         SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
         String name = cfg.getString("tile_name", "vivo TWS Air 3 Pro");
 

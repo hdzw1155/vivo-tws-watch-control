@@ -256,7 +256,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                 .setPositiveButton(R.string.dialog_agree, new android.content.DialogInterface.OnClickListener() {
                     @Override public void onClick(android.content.DialogInterface d, int w) {
                         getSharedPreferences("cfg", MODE_PRIVATE).edit()
-                                .putInt("disclaimer_ack_ver", currentVersionCode()).apply();
+                                .putBoolean("disclaimer_ack", true).apply();
                         disclaimerOk = true;
                         disclaimerDialogUp = false;
                         tryConnect();
@@ -269,14 +269,6 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                     }
                 })
                 .show();
-    }
-
-    private int currentVersionCode() {
-        try {
-            return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
-        } catch (Exception e) {
-            return -1;
-        }
     }
 
     private boolean hasPerm() {
@@ -309,9 +301,9 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     }
 
     private void tryConnect() {
-        // 全局免责确认: 每个新版本首次使用都要重新同意,同版本连续使用不再弹
-        if (!disclaimerOk && getSharedPreferences("cfg", MODE_PRIVATE)
-                .getInt("disclaimer_ack_ver", -1) != currentVersionCode()) {
+        // 全局免责确认: 首次安装弹一次,同意后一直用不再弹(用户明确要求)
+        if (!disclaimerOk && !getSharedPreferences("cfg", MODE_PRIVATE)
+                .getBoolean("disclaimer_ack", false)) {
             showDisclaimerDialog();
             return;
         }
