@@ -66,38 +66,33 @@ public class TwsTileService extends TileService {
     }
 
     /** 运行时画一个纯电量环(不含文字): 深色底 + 灰轨道 + 绿进度, 文字交给系统渲染 */
-    private static String fmtBatt(String label, int v) {
-        if (v < 0 || v > 100) return label + " --";
-        return label + " " + v + "%";
-    }
-
     private byte[] renderRing(String label, int pct) {
         boolean known = pct >= 0 && pct <= 100;
-        Bitmap bmp = Bitmap.createBitmap(192, 192, Bitmap.Config.ARGB_8888);
+        Bitmap bmp = Bitmap.createBitmap(232, 232, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(bmp);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         p.setStyle(Paint.Style.FILL);
         p.setColor(0xFF1C1C1E);
-        c.drawCircle(96, 96, 88, p);
+        c.drawCircle(116, 116, 106, p);
 
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(14f);
+        p.setStrokeWidth(16f);
         p.setColor(0xFF3A3A3C);
-        c.drawCircle(96, 96, 82, p);
+        c.drawCircle(116, 116, 100, p);
 
         if (known) {
             p.setColor(0xFF30D158);
-            c.drawArc(14, 14, 178, 178, -90, 360f * pct / 100f, false, p);
+            c.drawArc(18, 18, 214, 214, -90, 360f * pct / 100f, false, p);
         }
 
         p.setColor(0xFFFFFFFF);
         p.setTextAlign(Paint.Align.CENTER);
-        p.setTextSize(known ? 34f : 38f);
-        c.drawText(label, 96, 88, p);
-        p.setFakeBoldText(true);
         p.setTextSize(known ? 40f : 44f);
-        c.drawText(known ? pct + "%" : "--", 96, 134, p);
+        p.setFakeBoldText(true);
+        c.drawText(label, 116, 106, p);
+        p.setTextSize(46f);
+        c.drawText(known ? pct + "%" : "--", 116, 158, p);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
@@ -149,13 +144,6 @@ public class TwsTileService extends TileService {
                                 .setHeight(DimensionBuilders.dp(18f))
                                 .build())
                         .build())
-                .addContent(new LayoutElementBuilders.Text.Builder()
-                        .setText(label)
-                        .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
-                                .setSize(DimensionBuilders.sp(10f))
-                                .setColor(ColorBuilders.argb(active ? 0xFF3478F6 : 0xFF8E8E93))
-                                .build())
-                        .build())
                 .build();
     }
 
@@ -173,8 +161,8 @@ public class TwsTileService extends TileService {
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
                                         .setData(renderRing("左", l))
-                                        .setWidthPx(192)
-                                        .setHeightPx(192)
+                                        .setWidthPx(232)
+                                        .setHeightPx(232)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
@@ -182,8 +170,8 @@ public class TwsTileService extends TileService {
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
                                         .setData(renderRing("右", r))
-                                        .setWidthPx(192)
-                                        .setHeightPx(192)
+                                        .setWidthPx(232)
+                                        .setHeightPx(232)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
@@ -191,8 +179,8 @@ public class TwsTileService extends TileService {
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
                                         .setData(renderRing("盒", c))
-                                        .setWidthPx(192)
-                                        .setHeightPx(192)
+                                        .setWidthPx(232)
+                                        .setHeightPx(232)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
@@ -225,8 +213,6 @@ public class TwsTileService extends TileService {
         int l = cfg.getInt("tile_batt_l", -1);
         int r = cfg.getInt("tile_batt_r", -1);
         int c = cfg.getInt("tile_batt_c", -1);
-        String battLine = fmtBatt("左", l) + " · " + fmtBatt("右", r)
-                + " · " + fmtBatt("盒", c);
 
         LayoutElementBuilders.Layout layout =
                 new LayoutElementBuilders.Layout.Builder()
@@ -259,27 +245,15 @@ public class TwsTileService extends TileService {
                                                 .setHeight(DimensionBuilders.dp(8f))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Row.Builder()
-                                                .addContent(ringImage("ring_l", 48))
+                                                .addContent(ringImage("ring_l", 60))
                                                 .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                         .setWidth(DimensionBuilders.dp(5f))
                                                         .build())
-                                                .addContent(ringImage("ring_r", 48))
+                                                .addContent(ringImage("ring_r", 60))
                                                 .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                         .setWidth(DimensionBuilders.dp(5f))
                                                         .build())
-                                                .addContent(ringImage("ring_c", 48))
-                                                .build())
-                                        .addContent(new LayoutElementBuilders.Text.Builder()
-                                                .setText(battLine)
-                                                .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
-                                                        .setSize(DimensionBuilders.sp(11f))
-                                                        .setColor(ColorBuilders.argb(0xFFFFFFFF))
-                                                        .build())
-                                                .setModifiers(new ModifiersBuilders.Modifiers.Builder()
-                                                        .setPadding(new ModifiersBuilders.Padding.Builder()
-                                                                .setTop(DimensionBuilders.dp(4f))
-                                                                .build())
-                                                        .build())
+                                                .addContent(ringImage("ring_c", 60))
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Spacer.Builder()
                                                 .setHeight(DimensionBuilders.dp(8f))
