@@ -86,6 +86,8 @@ public class TwsTileService extends TileService {
             c.drawArc(18, 18, 214, 214, -90, 360f * pct / 100f, false, p);
         }
 
+        // 文字必须用 FILL: 上一步画弧后画笔停在 STROKE 模式, 直接写字会变成描边轮廓(糊成一坨的根因)
+        p.setStyle(Paint.Style.FILL);
         p.setColor(0xFFFFFFFF);
         p.setTextAlign(Paint.Align.CENTER);
         p.setTextSize(known ? 40f : 44f);
