@@ -68,31 +68,31 @@ public class TwsTileService extends TileService {
     /** 运行时画一个电量环: 深色底 + 灰轨道 + 绿进度 + 环内"标签+百分比"两行字 */
     private byte[] renderRing(String label, int pct) {
         boolean known = pct >= 0 && pct <= 100;
-        Bitmap bmp = Bitmap.createBitmap(248, 248, Bitmap.Config.ARGB_8888);
+        Bitmap bmp = Bitmap.createBitmap(372, 372, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(bmp);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         p.setStyle(Paint.Style.FILL);
         p.setColor(0xFF1C1C1E);
-        c.drawCircle(124, 124, 112, p);
+        c.drawCircle(186, 186, 170, p);
 
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(17f);
+        p.setStrokeWidth(25f);
         p.setColor(0xFF3A3A3C);
-        c.drawCircle(124, 124, 98, p);
+        c.drawCircle(186, 186, 148, p);
 
         if (known) {
             p.setColor(0xFF30D158);
-            c.drawArc(28, 28, 220, 220, -90, 360f * pct / 100f, false, p);
+            c.drawArc(42, 42, 330, 330, -90, 360f * pct / 100f, false, p);
         }
 
         p.setColor(0xFFFFFFFF);
         p.setTextAlign(Paint.Align.CENTER);
-        p.setTextSize(known ? 44f : 48f);
+        p.setTextSize(known ? 108f : 120f);
         p.setFakeBoldText(true);
-        c.drawText(label, 124, 116, p);
-        p.setTextSize(52f);
-        c.drawText(known ? pct + "%" : "--", 124, 174, p);
+        c.drawText(label, 186, 176, p);
+        p.setTextSize(130f);
+        c.drawText(known ? pct + "%" : "--", 186, 264, p);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
