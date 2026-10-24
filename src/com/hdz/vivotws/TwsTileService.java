@@ -71,25 +71,33 @@ public class TwsTileService extends TileService {
         return label + " " + v + "%";
     }
 
-    private byte[] renderRing(int pct) {
+    private byte[] renderRing(String label, int pct) {
         boolean known = pct >= 0 && pct <= 100;
-        Bitmap bmp = Bitmap.createBitmap(240, 240, Bitmap.Config.ARGB_8888);
+        Bitmap bmp = Bitmap.createBitmap(192, 192, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(bmp);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         p.setStyle(Paint.Style.FILL);
         p.setColor(0xFF1C1C1E);
-        c.drawCircle(120, 120, 114, p);
+        c.drawCircle(96, 96, 88, p);
 
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(16f);
+        p.setStrokeWidth(14f);
         p.setColor(0xFF3A3A3C);
-        c.drawCircle(120, 120, 106, p);
+        c.drawCircle(96, 96, 82, p);
 
         if (known) {
             p.setColor(0xFF30D158);
-            c.drawArc(16, 16, 224, 224, -90, 360f * pct / 100f, false, p);
+            c.drawArc(14, 14, 178, 178, -90, 360f * pct / 100f, false, p);
         }
+
+        p.setColor(0xFFFFFFFF);
+        p.setTextAlign(Paint.Align.CENTER);
+        p.setTextSize(known ? 34f : 38f);
+        c.drawText(label, 96, 88, p);
+        p.setFakeBoldText(true);
+        p.setTextSize(known ? 40f : 44f);
+        c.drawText(known ? pct + "%" : "--", 96, 134, p);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
@@ -164,27 +172,27 @@ public class TwsTileService extends TileService {
                 .addIdToImageMapping("ring_l",
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
-                                        .setData(renderRing(l))
-                                        .setWidthPx(240)
-                                        .setHeightPx(240)
+                                        .setData(renderRing("左", l))
+                                        .setWidthPx(192)
+                                        .setHeightPx(192)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
                 .addIdToImageMapping("ring_r",
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
-                                        .setData(renderRing(r))
-                                        .setWidthPx(240)
-                                        .setHeightPx(240)
+                                        .setData(renderRing("右", r))
+                                        .setWidthPx(192)
+                                        .setHeightPx(192)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
                 .addIdToImageMapping("ring_c",
                         new ResourceBuilders.ImageResource.Builder()
                                 .setInlineResource(new ResourceBuilders.InlineImageResource.Builder()
-                                        .setData(renderRing(c))
-                                        .setWidthPx(240)
-                                        .setHeightPx(240)
+                                        .setData(renderRing("盒", c))
+                                        .setWidthPx(192)
+                                        .setHeightPx(192)
                                         .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                         .build())
                                 .build())
