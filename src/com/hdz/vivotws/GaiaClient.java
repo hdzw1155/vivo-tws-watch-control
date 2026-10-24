@@ -47,10 +47,6 @@ public class GaiaClient {
     public static final int RESP_DEEPX = 0x8218;
 
     // 空间音效预设(标准/剧场/音乐厅/录音棚/演唱会): 命令号来自官方 APK 反编译,未实测
-    public static final int CMD_SPATIALFX_SET = 0x013E;
-    public static final int CMD_SPATIALFX_QUERY = 0x023E;
-    public static final int RESP_SPATIALFX_ACK = 0x813E;
-    public static final int RESP_SPATIALFX = 0x823E;
 
     public static final int MODE_ANC = 0x00;
     public static final int MODE_OFF = 0x01;
@@ -311,34 +307,6 @@ public class GaiaClient {
         writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_DEEPX_SET,
                 new byte[]{(byte) mode});
     }
-
-    // ---- 空间音效预设(实验,APK 反编译推断) ----
-
-    public void querySpatialFx() {
-        boolean v4 = cfg == CFG_FAMILY_V4;
-        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_SPATIALFX_QUERY,
-                v4 ? new byte[]{0x00} : null);
-    }
-
-    /** 空间音效预设: payload 格式未知,探针轮换候选,每次调用发一种并留日志 */
-    public void setSpatialFx(int preset) {
-        final int[][] probes = {
-                {0x03, preset},             // 0: v3 [preset]
-                {0x03, preset, 0x00},       // 1: v3 [preset 00]
-                {0x04, preset},             // 2: v4 [preset]
-                {0x03, 0x00, preset},       // 3: v3 [00 preset]
-                {0x04, 0x00, preset},       // 4: v4 [00 preset]
-        };
-        int i = spatialFxProbeIdx++ % probes.length;
-        int verb = probes[i][0];
-        byte[] payload = new byte[probes[i].length - 1];
-        for (int k = 1; k < probes[i].length; k++) payload[k - 1] = (byte) probes[i][k];
-        android.util.Log.d("GaiaClient", "sfx probe#" + i + " verb=0x"
-                + Integer.toHexString(verb) + " payload=" + toHex(payload));
-        writeFrame(verb, VENDOR_VIVO, CMD_SPATIALFX_SET, payload);
-    }
-
-    private static int spatialFxProbeIdx = 0;
 
     // ---- 接收 ----
 

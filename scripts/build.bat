@@ -25,6 +25,13 @@ if not exist "%PLAT%" (
   echo [X] 未找到 android.jar, 先运行 scripts\setup-env.bat
   exit /b 1
 )
+rem 磁贴库(androidx.wear.tiles)及依赖, 由 scripts\fetch-libs.bat 下载到 libs\
+set LIBS=%~dp0..\libs
+set CP_JARS=%LIBS%\tiles-1.1.0.jar;%LIBS%\tiles-proto-1.1.0.jar;%LIBS%\annotation-1.2.0.jar;%LIBS%\annotation-experimental-1.2.0.jar;%LIBS%\listenablefuture-1.0.jar
+if not exist "%LIBS%\tiles-1.1.0.jar" (
+  echo [X] 未找到 libs\tiles-1.1.0.jar, 先运行 scripts\fetch-libs.bat
+  exit /b 1
+)
 
 if not exist keystore\debug.keystore (
   mkdir keystore 2>nul
@@ -43,7 +50,7 @@ echo [2/6] aapt2 link...
 "%BT%\aapt2.exe" link -o build\app.unsigned.apk -I "%PLAT%" ^
   --manifest AndroidManifest.xml --java build\gen ^
   --min-sdk-version 30 --target-sdk-version 34 ^
-  --version-code 10 --version-name 0.2.7 ^
+  --version-code 11 --version-name 0.3.0 ^
   --auto-add-overlay build\res.zip || exit /b 1
 
 echo [3/6] javac...
@@ -52,19 +59,24 @@ set SRCS=
 for /r src %%f in (*.java) do set "SRCS=!SRCS! "%%f""
 for /r build\gen %%f in (*.java) do set "SRCS=!SRCS! "%%f""
 javac -source 8 -target 8 -encoding UTF-8 ^
-  -bootclasspath "%PLAT%" -d build\classes !SRCS! || exit /b 1
+  -bootclasspath "%PLAT%" -classpath "%CP_JARS%" -d build\classes !SRCS! || exit /b 1
 endlocal
 
 echo [4/6] d8 dex...
 pushd build\classes
 jar cf ..\classes.jar com || exit /b 1
 popd
-call "%BT%\d8.bat" --release --lib "%PLAT%" --min-api 30 ^
+rem d8 的 --lib 不接受分号串,逐个 jar 传
+setlocal enabledelayedexpansion
+set D8LIBS=--lib "%PLAT%"
+for %%j in ("%LIBS%\*.jar") do set "D8LIBS=!D8LIBS! --lib "%%j""
+call "%BT%\d8.bat" --release !D8LIBS! --min-api 30 ^
   --output build build\classes.jar || exit /b 1
+endlocal
 
-echo [5/6] 打包 classes.dex...
+echo [5/6] 打包 dex...
 powershell -NoProfile -Command ^
-  "Add-Type -AssemblyName System.IO.Compression,System.IO.Compression.FileSystem; $z=[System.IO.Compression.ZipFile]::Open('build\app.unsigned.apk','Update'); $e=$z.CreateEntry('classes.dex'); $s=$e.Open(); $f=[System.IO.File]::OpenRead('build\classes.dex'); $f.CopyTo($s); $f.Close(); $s.Close(); $z.Dispose()" || exit /b 1
+  "Add-Type -AssemblyName System.IO.Compression,System.IO.Compression.FileSystem; $z=[System.IO.Compression.ZipFile]::Open('build\app.unsigned.apk','Update'); Get-ChildItem 'build' -Filter '*.dex' | ForEach-Object { $e=$z.CreateEntry($_.Name); $s=$e.Open(); $f=[System.IO.File]::OpenRead($_.FullName); $f.CopyTo($s); $f.Close(); $s.Close() }; $z.Dispose()" || exit /b 1
 
 echo [6/6] 对齐 + 签名...
 "%BT%\zipalign.exe" -f 4 build\app.unsigned.apk build\app.aligned.apk || exit /b 1

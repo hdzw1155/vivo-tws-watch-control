@@ -390,6 +390,10 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
 
     @Override
     public void onConnected(final String deviceName) {
+        getSharedPreferences("cfg", MODE_PRIVATE).edit()
+                .putString("tile_status", "已连接")
+                .putString("tile_name", deviceName == null ? "vivo 耳机" : deviceName)
+                .apply();
         ui.post(new Runnable() {
             @Override public void run() {
                 status.setTextColor(Color.WHITE);
@@ -405,12 +409,32 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         setBatt(pctL, barL, left, (chargeFlags & 0x01) != 0);
         setBatt(pctR, barR, right, (chargeFlags & 0x02) != 0);
         setBatt(pctC, barC, box, (chargeFlags & 0x04) != 0);
+        // 给系统磁贴留快照(磁贴每 5 分钟读一次)
+        getSharedPreferences("cfg", MODE_PRIVATE).edit()
+                .putString("tile_batt",
+                        fmtBatt("左", left) + "  " + fmtBatt("右", right)
+                                + "  盒 " + fmtBatt("盒", box)
+                                + (((chargeFlags & 0x07) != 0) ? " ⚡" : ""))
+                .apply();
+    }
+
+    private static String fmtBatt(String label, int v) {
+        if (v < 0 || v > 100) return label + " --";
+        return label + " " + v + "%";
     }
 
     @Override
     public void onNoiseMode(int mode) {
         lastMode = mode;
         renderMode();
+        // 给降噪切换磁贴留快照
+        if (mode >= 0 && mode < 3) {
+            getSharedPreferences("cfg", MODE_PRIVATE).edit()
+                    .putInt("tile_mode", mode)
+                    .putString("tile_mode_name",
+                            new String[]{"降噪开", "降噪关", "通透"}[mode])
+                    .apply();
+        }
     }
 
     @Override
@@ -467,6 +491,8 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     @Override
     public void onDisconnected(String reason) {
         clearData();
+        getSharedPreferences("cfg", MODE_PRIVATE).edit()
+                .putString("tile_status", "未连接").apply();
         ui.post(new Runnable() {
             @Override public void run() {
                 status.setTextColor(COL_LABEL_GRAY);

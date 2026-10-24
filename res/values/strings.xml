@@ -9,6 +9,7 @@
     <string name="btn_trans">通透</string>
     <string name="btn_refresh">刷新电量</string>
     <string name="dev_section">开发者设置</string>
+    <string name="tile_desc">耳机电量与降噪控制</string>
     <string name="dev_unlocked_toast">开发者设置已开启</string>
     <string name="spatial_switch">空间音频</string>
     <string name="spatial_caption">实验功能，作者感觉无效；仅限 vivo TWS Air 3 Pro；⚠️ 切换前必须摘下耳机、音量调至最低，谨防突发爆音损伤听力</string>
