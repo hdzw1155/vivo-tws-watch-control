@@ -101,21 +101,70 @@ FF | VERB | 00 | LEN | VENDOR(2B 大端) | CMD(2B 大端) | PAYLOAD(LEN 字节)
 - **弹窗结论**（做过三轮，最终放弃）：Wear OS 不支持 FullScreenIntent 全屏通知（官方文档明说）；
   直拉全屏 Activity 需要 SYSTEM_ALERT_WINDOW 授权（adb `appops set ... allow`），
   且弹完会把应用任务栈带到前台、Samsung 后台限制偶尔拦；高优先级通知 peek 卡在
-  三星表上只进通知流不浮层。三版代码留在本地 popup-dev 分支存档
+  三星表上只进通知流不浮层。（三版代码曾存 popup-dev 分支，后已删）
+- **重连任务必须可取消**（踩过的坑）：onDisconnected 里 postDelayed 的重连任务要存字段，
+  onPause 时 removeCallbacks——否则断连后 3 秒内切后台，会在后台重连并一直占着耳机
+  的 RFCOMM 连接位（耗电+顶掉第三台设备）
+- **旧连接回调守卫**：所有 fire 回调（电量/模式/错误等）开头检查 `if (closing) return;`
+  ——旧 client 被新 client 顶掉后，残留读线程的最后一帧不该再上 UI
 - **多监听者**：GaiaClient 用 CopyOnWriteArrayList 支持多 Listener（页面+后台服务共用连接）
 - **UI**：432×432 圆屏，卡片式深色布局，ScrollView 记得 `scrollbars="none"`（默认滚动条
   在圆屏边缘像残影）。396/450 尺寸用 `wm size` 模拟验证过，自适应权重布局无裁切
 - **开关类 UI**：未知/异步状态用循环 Button 比 Switch 稳（Switch 有回写抖动问题，
   需要 guard 标志 + 4 秒抑制窗口）
 
+## 4.5 系统磁贴（Tiles）实战——本项目坑最密的一块
+
+依赖 androidx.wear.tiles **1.1.0**（经典 Java 写法，新系统完全兼容，磁贴由系统渲染）。
+依赖链极小：tiles + tiles-proto + annotation + annotation-experimental + listenablefuture。
+注意 listenablefuture 只在 **Maven Central**（repo1.maven.org），Google Maven 上是 404。
+
+**黑屏磁贴的根因（排查了一天）**：库 jar 必须作为 **d8 的输入**（位置参数）一起打进 dex；
+`--lib` 只用于解析引用、不会打包。库不在包里 → 系统加载磁贴类时 ClassNotFound → 全黑。
+
+tiles 1.1 的 API 和新版教程差异（全踩过）：
+- Builder 用 `new Box.Builder()`，没有静态工厂 `Box.Builder()`
+- 没有 `ArcAnchor`/`ArcLength`（1.2 才有）；环内居中文字做不了 → 用**运行时 Canvas 画 PNG**
+  经 `InlineImageResource` 塞进资源（`setData/setWidthPx/setHeightPx`，format 用
+  `IMAGE_FORMAT_UNDEFINED` 让渲染器自动识别）
+- 图片映射要包两层：`ImageResource.Builder().setAndroidResourceByResId(AndroidImageResourceByResId...)`
+- `Clickable` 必须 `setId(...)`，否则部分渲染器点击无效
+- 磁贴按钮的跳转目标 Activity 必须 `android:exported="true"`（点击由系统发起，未导出=静默无反应）
+
+**Canvas 画字五轮才修好的坑**：画完弧线后 Paint 停在 STROKE 模式，直接 drawText 出来的
+全是描边轮廓（一团白色乱码）。写字前必须 `p.setStyle(Paint.Style.FILL)` 复位。
+
+**磁贴数据流**：磁贴进程读不到耳机的实时状态，用两条路：
+1. App/无界面切换器把快照写进 SharedPreferences（tile_batt_l/r/c、tile_mode 等），
+   磁贴 onTileRequest 时读；
+2. 连接状态用 TileState 实时查（记住耳机 MAC → 反射 `BluetoothDevice.isConnected()` →
+   GATT 已连接列表 → 30 分钟内成功通讯过的 last_ok 时间戳兜底——半入耳双链路空闲时
+   系统查询会漏判，单一手段都会误报"未连接"）
+数据变化后用 `TileService.getUpdater(ctx).requestUpdate(XxxTile.class)` 立即重画，
+不用等 freshnessIntervalMillis（设的 2 分钟）。
+
+**磁贴点击直切模式**：跳转一个透明无 UI 的 exported Activity（`Theme.Translucent.NoTitleBar`
++ excludeFromRecents + noHistory），onConnected 后 setNoiseMode、收到确认即 finish，
+8 秒超时兜底。磁贴按钮用 `addKeyToExtraMapping("target_mode", AndroidIntExtra)` 指定
+目标档位——点谁切谁，不是循环。
+
+**尺寸事实**：公开 Tiles API 的磁贴在表盘上永远占满一个槽位；One UI 8 的"半尺寸卡片"
+是三星私有框架，第三方做不了。内容往竖版 Column 里排，间距 6~8dp 收紧即可。
+
 ## 5. 免 Gradle 构建的坑（Windows）
 
-1. `.bat` 必须 **CRLF** + 开头 `chcp 65001`，LF 会被 cmd 解析成一堆乱命令
-2. javac 的 `@响应文件` 会吃反斜杠和中文路径 → 改用 `for /r` 枚举源文件、逐个加引号拼命令行
-3. Android 34 的 platform 包**没有 core-lambda-stubs.jar** → 源码别用 lambda（本项目全匿名内部类）
-4. `-source 11` 不让用 `-bootclasspath` → 用 `-source 8 -target 8`
-5. d8 前先 `jar cf` 打包 classes 再喂给它；classes.dex 用 PowerShell 的 ZipFile API 塞进 APK
-6. 每次 sed 改完 .bat 记得转回 CRLF（sed 会把换行洗成 LF）
+1. **`.bat` 必须纯 ASCII**（最重要的一条，血泪教训）：`chcp 65001` + 中文注释会让 cmd
+   解析器随机错位——文件内容一变（几个字节）解析位置就漂移，后面的步骤跳着执行、
+   构建时好时坏，而且表现为"成功"（装的是旧包）。build.bat 全英文注释、不写 chcp，
+   一劳永逸。中文输出提示也别写在 bat 里
+2. `.bat` 必须 CRLF 换行；sed 改完记得转回（sed 会洗成 LF）
+3. javac 的 `@响应文件` 会吃反斜杠和中文路径 → 改用 `for /r` 枚举源文件、逐个加引号拼命令行
+4. Android 34 的 platform 包**没有 core-lambda-stubs.jar** → 源码别用 lambda（本项目全匿名内部类）
+5. `-source 11` 不让用 `-bootclasspath` → 用 `-source 8 -target 8`
+6. d8 前先 `jar cf` 打包 classes 再喂给它；classes.dex 用 PowerShell 的 ZipFile API 塞进 APK
+7. 构建前 `rmdir build` 失败要显式报错退出（目录被占用时旧产物会让"构建成功"是假的）
+8. **验证构建真的成功**：改资源后从产物里抽文件对比（`tar -xf apk res/...`），
+   别信 "[OK]" 输出——见第 1 条，解析错位时会打印假 OK
 
 ## 6. 法律合规结构（为什么 App 里到处是弹窗）
 
@@ -126,11 +175,14 @@ FF | VERB | 00 | LEN | VENDOR(2B 大端) | CMD(2B 大端) | PAYLOAD(LEN 字节)
 
 ## 7. 待办与线索
 
+- 当前版本 0.3.0（versionCode 13）；免责弹窗按 versionCode 记忆，改版本号会重新弹
 - DeepX 的 3=清亮高音、5=悠扬听书 未实测（0/1/2 已验证）；想验证照 §3 方法点两下按钮看日志
 - 空间音频想定性：需要手机开"蓝牙 HCI 信息收集"抓官方 App 的 btsnoop 对照
   （vivo 手机 dumpstate 被封，bugreport 拿不到日志，需 root 或换机型）
 - 仓库 scripts/parse_btsnoop.js：写好的 btsnoop GAIA 帧扫描器，抓到日志直接 `node` 跑
 - 更多机型：TWS-Pods-PC 仓库有 huawei/ xiaomi/ moondrop/ 同族文档可挖
+  （多品牌续作见本地姊妹项目 tws-control-for-wear，注意其华为/小米协议层未实测）
+- 图标：res/mipmap/ic_launcher.png，用户偏好小尺寸原图（80×80 即可，别上高清大图）
 
 ## 8. 给你的 AI 的引导提示词（复制即用）
 
