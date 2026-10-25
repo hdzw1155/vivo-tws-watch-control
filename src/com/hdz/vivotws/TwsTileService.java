@@ -20,7 +20,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 
 import java.io.ByteArrayOutputStream;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
@@ -28,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 public class TwsTileService extends TileService {
 
     private static final long REFRESH_MS = 5 * 60 * 1000; // 15秒会逼系统整夜重画,是耗电元凶;数据变化有requestUpdate主动推,磁贴可见时系统本来就会勤问
-    private static final String[] EARS = {"左", "右", "盒"};
 
     private static final class DoneFuture implements ListenableFuture<Object> {
         private final Object value;
@@ -234,7 +232,7 @@ public class TwsTileService extends TileService {
             RequestBuilders.TileRequest requestParams) {
         int[] s = snapshot(this);
         int mode = s[3];
-        String status = TileState.liveStatus(this);
+        String status = TileState.lastSeenText(this);
         // 诊断: 系统来要磁贴时,把我们算出的状态打到日志,验证"没重画"还是"算错"
         android.util.Log.d("TileSvc", "onTileRequest status=" + status
                 + " batt=" + s[0] + "/" + s[1] + "/" + s[2]);
@@ -257,7 +255,7 @@ public class TwsTileService extends TileService {
                                                 .setText(status)
                                                 .setFontStyle(new LayoutElementBuilders.FontStyle.Builder()
                                                         .setSize(DimensionBuilders.sp(12f))
-                                                        .setColor(ColorBuilders.argb(0xFF9BE29B))
+                                                        .setColor(ColorBuilders.argb(0xFF8E8E93))
                                                         .build())
                                                 .build())
                                         .addContent(new LayoutElementBuilders.Text.Builder()

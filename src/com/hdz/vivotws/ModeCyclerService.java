@@ -12,34 +12,22 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 
-import androidx.wear.tiles.TileService;
-
 /**
  * 磁贴降噪切换的后台服务: 跳板 Activity 秒退,这里无界面地连耳机切模式,
  * 完成或 8 秒超时就自杀。耳机不在时最多静默等 8 秒,不再冻结界面。
  */
 public class ModeCyclerService extends Service implements GaiaClient.Listener {
 
-    private static final String[] NAMES = {"降噪开", "降噪关", "通透"};
-
     private GaiaClient client;
     private int nextMode;
     private boolean done = false;
     private final Handler h = new Handler();
 
-    /** 主界面的后台自杀让路标志: 服务活着时为 true,杀进程前看一眼 */
-    static volatile boolean running = false;
     private final Runnable timeout = new Runnable() {
         @Override public void run() {
             stopSelf();
         }
     };
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        running = true;
-    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -55,6 +43,13 @@ public class ModeCyclerService extends Service implements GaiaClient.Listener {
         // 磁贴传来的指定档位(点谁切谁,0..2); 没传或越界就循环下一档
         int wanted = intent != null ? intent.getIntExtra("target_mode", -1) : -1;
         nextMode = (wanted >= 0 && wanted <= 2) ? wanted : (last + 1) % 3;
+
+        // 磁贴连点第二下会再进这里: 灭掉上一把没收工的连接,别让两个客户端抢耳机
+        done = false;
+        if (client != null) {
+            client.disconnect();
+            client = null;
+        }
 
         BluetoothAdapter adapter =
                 ((BluetoothManager) getSystemService(BLUETOOTH_SERVICE)).getAdapter();
@@ -77,8 +72,7 @@ public class ModeCyclerService extends Service implements GaiaClient.Listener {
 
     @Override
     public void onConnected(String deviceName) {
-        getSharedPreferences("cfg", MODE_PRIVATE).edit()
-                .putLong("tile_last_ok", System.currentTimeMillis()).apply();
+        TileStore.noteOk(this);
         if (client != null) client.setNoiseMode(nextMode);
     }
 
@@ -86,15 +80,9 @@ public class ModeCyclerService extends Service implements GaiaClient.Listener {
     public void onNoiseMode(int mode) {
         // 耳机确认了新模式,记下来让磁贴和主界面显示正确
         if (mode < 0 || mode > 2 || mode != nextMode) return;
-        getSharedPreferences("cfg", MODE_PRIVATE).edit()
-                .putInt("tile_mode", mode)
-                .putString("tile_mode_name", NAMES[mode])
-                .putLong("tile_last_ok", System.currentTimeMillis())
-                .apply();
-        try {
-            TileService.getUpdater(this).requestUpdate(TwsTileService.class);
-        } catch (Exception ignored) {
-        }
+        TileStore.saveMode(this, mode);
+        TileStore.noteOk(this);
+        TileStore.push(this);
         complete();
     }
 
@@ -122,7 +110,6 @@ public class ModeCyclerService extends Service implements GaiaClient.Listener {
 
     @Override
     public void onDestroy() {
-        running = false;
         h.removeCallbacksAndMessages(null);
         if (client != null) {
             client.disconnect();

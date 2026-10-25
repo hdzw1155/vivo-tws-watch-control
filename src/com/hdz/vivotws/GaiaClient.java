@@ -40,13 +40,14 @@ public class GaiaClient {
     public static final int RESP_SPATIAL = 0x8239;
 
     // DeepX 音效: 命令号与格式已真机验证(Air3 Pro)——SET 单字节 [mode], ACK 0x8118 回 [00,mode],
-    // 查询 0x8218 回 [00,mode]; mode 0=标准 1=清澈人声 2=超重低音(真机验证), 3=清亮高音 4=悠扬听书(按官方 App 显示顺序推断,未实测)
+    // 查询 0x8218 回 [00,mode]; 真实值 0/1/2/3/5(官方跳过 0x04): 0=标准 1=清澈人声 2=超重低音
+    // (实测), 3=清亮高音 5=悠扬听书(未实测)
     public static final int CMD_DEEPX_SET = 0x0118;
     public static final int CMD_DEEPX_QUERY = 0x0218;
     public static final int RESP_DEEPX_ACK = 0x8118;
     public static final int RESP_DEEPX = 0x8218;
 
-    // 空间音效预设(标准/剧场/音乐厅/录音棚/演唱会): 命令号来自官方 APK 反编译,未实测
+    // 空间音效预设 0x013E: Air3 Pro 真机上候选全沉默,已证伪弃用(档案见 docs/AI_CONTEXT.md)
 
     public static final int MODE_ANC = 0x00;
     public static final int MODE_OFF = 0x01;
@@ -90,8 +91,9 @@ public class GaiaClient {
     }
 
     private final List<Listener> listeners = new CopyOnWriteArrayList<Listener>();
-    private BluetoothSocket socket;
-    private OutputStream out;
+    // socket/out 在连接线程写、UI 线程读(isConnected/发送),必须 volatile
+    private volatile BluetoothSocket socket;
+    private volatile OutputStream out;
     private volatile boolean closing = false;
     private int cfg = CFG_FAMILY_V4;
 
@@ -236,6 +238,11 @@ public class GaiaClient {
 
     // ---- 发送 ----
 
+    /** 家族 v4 用 verb4,其余机型 verb3;用错耳机直接沉默(不报错,表现为超时) */
+    private int verb() {
+        return cfg == CFG_FAMILY_V4 ? 0x04 : 0x03;
+    }
+
     private synchronized void writeFrame(int verb, int vendor, int cmd, byte[] payload) {
         if (out == null) return;
         int len = payload == null ? 0 : payload.length;
@@ -267,7 +274,7 @@ public class GaiaClient {
 
     public void queryNoise() {
         byte[] payload = cfg == CFG_FAMILY_V4 ? new byte[]{0x00} : new byte[0];
-        writeFrame(cfg == CFG_FAMILY_V4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_NOISE_QUERY, payload);
+        writeFrame(verb(), VENDOR_VIVO, CMD_NOISE_QUERY, payload);
     }
 
     public void setNoiseMode(int mode) {
@@ -278,22 +285,21 @@ public class GaiaClient {
         byte[] payload = new byte[1 + suffix.length];
         payload[0] = (byte) mode;
         System.arraycopy(suffix, 0, payload, 1, suffix.length);
-        writeFrame(cfg == CFG_FAMILY_V4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_NOISE_SET, payload);
+        writeFrame(verb(), VENDOR_VIVO, CMD_NOISE_SET, payload);
     }
 
     // ---- 空间音频(实验性) ----
 
     public void querySpatial() {
         boolean v4 = cfg == CFG_FAMILY_V4;
-        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_SPATIAL_QUERY,
+        writeFrame(verb(), VENDOR_VIVO, CMD_SPATIAL_QUERY,
                 v4 ? new byte[]{0x00} : null);
     }
 
     /** 空间音频开关: v3/v4 均被耳机接受,取与降噪一致的 verb; 载荷 [01]=开 [00]=关
      *  (真机探测确认: Air3 Pro 上 v3 [01] 使 0x8239 状态翻转为 01) */
     public void setSpatial(boolean on) {
-        boolean v4 = cfg == CFG_FAMILY_V4;
-        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_SPATIAL_SET,
+        writeFrame(verb(), VENDOR_VIVO, CMD_SPATIAL_SET,
                 new byte[]{(byte) (on ? 0x01 : 0x00)});
     }
 
@@ -301,15 +307,14 @@ public class GaiaClient {
 
     public void queryDeepX() {
         boolean v4 = cfg == CFG_FAMILY_V4;
-        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_DEEPX_QUERY,
+        writeFrame(verb(), VENDOR_VIVO, CMD_DEEPX_QUERY,
                 v4 ? new byte[]{0x00} : null);
     }
 
     /** DeepX 音效设置: 载荷为单字节 [mode],真实值 0/1/2/3/5(0x04 被官方跳过,悠扬听书=5),
      *  verb 按 cfg 取, ACK 0x8118 回 [00, mode],与降噪/空间音频同款套路 */
     public void setDeepX(int mode) {
-        boolean v4 = cfg == CFG_FAMILY_V4;
-        writeFrame(v4 ? 0x04 : 0x03, VENDOR_VIVO, CMD_DEEPX_SET,
+        writeFrame(verb(), VENDOR_VIVO, CMD_DEEPX_SET,
                 new byte[]{(byte) mode});
     }
 
@@ -322,15 +327,18 @@ public class GaiaClient {
                     InputStream in = socket.getInputStream();
                     byte[] head = new byte[8];
                     while (!closing) {
-                        if (!readFully(in, head, 8)) break;
+                        if (!readFully(in, head, 0, 8)) break;
                         if ((head[0] & 0xFF) != 0xFF) {
-                            continue; // 流错位,丢弃继续同步
+                            // 流错位: 滑动一个字节重新找帧头,整块丢会漏掉真帧
+                            System.arraycopy(head, 1, head, 0, 7);
+                            if (!readFully(in, head, 7, 1)) break;
+                            continue;
                         }
                         int len = head[3] & 0xFF;
                         int vendor = ((head[4] & 0xFF) << 8) | (head[5] & 0xFF);
                         int cmd = ((head[6] & 0xFF) << 8) | (head[7] & 0xFF);
                         byte[] payload = new byte[len];
-                        if (len > 0 && !readFully(in, payload, len)) break;
+                        if (len > 0 && !readFully(in, payload, 0, len)) break;
 
                         if (vendor == VENDOR_VIVO && cmd == RESP_BATT && payload.length >= 5) {
                             fireBattery(payload[1] & 0xFF, payload[2] & 0xFF,
@@ -368,12 +376,13 @@ public class GaiaClient {
         }, "gaia-reader").start();
     }
 
-    private static boolean readFully(InputStream in, byte[] buf, int n) throws IOException {
-        int off = 0;
-        while (off < n) {
-            int r = in.read(buf, off, n - off);
+    private static boolean readFully(InputStream in, byte[] buf, int off, int n)
+            throws IOException {
+        while (n > 0) {
+            int r = in.read(buf, off, n);
             if (r < 0) return false;
             off += r;
+            n -= r;
         }
         return true;
     }

@@ -5,7 +5,6 @@ import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -14,13 +13,15 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
-import androidx.wear.tiles.TileService;
 import android.os.SystemClock;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -59,7 +60,35 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private long connectStartAt = 0;
     private Runnable refresher;
     private Runnable reconnectTask;
-    private Runnable bgExit;
+    private ScrollView scrollHost;
+    // 表冠滚动泵: 事件增量累进 pending,泵每 16ms 逐帧逼近目标;
+    // 若每个事件各起一段 smooth 动画,动画反复重启就会一顿一顿
+    private float crownPendingPx;
+    private boolean crownPumping;
+    private float crownTickAcc;
+    private static final float CROWN_DETENT_DP = 36f; // 转满一格滚这么多,震一下(与滚动条滑块移动感一致)
+    private final Runnable crownPump = new Runnable() {
+        @Override public void run() {
+            if (scrollHost == null || isFinishing() || isDestroyed()
+                    || crownPendingPx == 0f) {
+                crownPumping = false;
+                return;
+            }
+            float move = crownPendingPx * 0.35f; // 指数缓动:越接近目标越慢
+            if (Math.abs(move) < 1f) move = Math.signum(crownPendingPx);
+            int y = scrollHost.getScrollY();
+            int max = Math.max(0,
+                    scrollHost.getChildAt(0).getHeight() - scrollHost.getHeight());
+            if ((y <= 0 && move < 0) || (y >= max && move > 0)) {
+                crownPendingPx = 0; // 已顶到头,别空转
+                crownPumping = false;
+                return;
+            }
+            scrollHost.scrollBy(0, (int) move);
+            crownPendingPx -= move;
+            ui.postDelayed(this, 16);
+        }
+    };
     private Switch swSpatial;
     private boolean spatialGuard;
     private long spatialSetAt = 0;
@@ -76,9 +105,6 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         return "未知";
     }
 
-    // 空间音效预设(推断值 0..4): 标准/剧场/音乐厅/录音厅/演唱会
-    private static final String[] SPATIALFX_NAMES =
-            {"标准", "剧场", "音乐厅", "录音棚", "演唱会"};
 
     private Button btnDeepx;
     private int deepxMode = -1;   // 当前档位(数组下标)
@@ -88,6 +114,9 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private long lastTapAt = 0;
     private boolean disclaimerOk = false;
     private boolean disclaimerDialogUp = false;
+
+    /** 进程是否活着主界面(磁贴切换服务收工时看它决定要不要带走空壳进程) */
+    static volatile boolean resumed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,6 +140,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         swSpatial = findViewById(R.id.switch_spatial);
         btnDeepx = findViewById(R.id.btn_deepx);
         devSection = findViewById(R.id.dev_section);
+        scrollHost = findViewById(R.id.scroll);
 
         // 开发者设置: 默认关闭,连点入口 5 下本会话内显示(不持久化)
         final TextView devHint = findViewById(R.id.dev_hint);
@@ -186,34 +216,69 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     @Override
     protected void onResume() {
         super.onResume();
+        resumed = true;
         tryConnect();
-        // 周期自检: 连着就刷新状态,断了(比如耳机开关机)就自动重连
-        if (refresher == null) {
-            refresher = new Runnable() {
-                @Override public void run() {
-                    if (isFinishing() || isDestroyed()) return;
-                    if (client != null && client.isConnected()) {
-                        client.queryBattery();
-                        client.queryNoise();
+        // 阶梯轮询省电: 连上先快查两轮拿首屏,之后转 30 秒慢轮询;
+        // 空间音频/DeepX 状态几乎不变,降到每 4 轮(约 2 分钟)问一次
+        ui.removeCallbacks(refresher);
+        refresher = new Runnable() {
+            int tick = 0;
+
+            @Override public void run() {
+                if (isFinishing() || isDestroyed()) return;
+                tick++;
+                if (client != null && client.isConnected()) {
+                    client.queryBattery();
+                    client.queryNoise();
+                    if (tick == 1 || tick % 4 == 0) {
                         client.querySpatial();
                         client.queryDeepX();
-                    } else if (client == null
-                            || SystemClock.elapsedRealtime() - connectStartAt > 12000) {
-                        // 没有进行中的连接尝试才重连,避免打断慢连接
-                        tryConnect();
                     }
-                    ui.postDelayed(this, 5000);
+                } else if (client == null
+                        || SystemClock.elapsedRealtime() - connectStartAt > 12000) {
+                    // 没有进行中的连接尝试才重连,避免打断慢连接
+                    tryConnect();
                 }
-            };
-        }
-        ui.removeCallbacks(refresher);
+                // 前 2 轮 5 秒(首屏),之后 30 秒(省电)
+                ui.postDelayed(this, tick <= 2 ? 5000L : 30000L);
+            }
+        };
         ui.postDelayed(refresher, 5000);
+    }
+
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent e) {
+        // 表冠/表圈归页面滚动: ScrollView 不认 rotary 事件源,事件会漏到 Activity 这里,
+        // 自己接住滚——焦点落在按钮上也不会被抢去切功能
+        float delta = e.getAxisValue(MotionEvent.AXIS_SCROLL);
+        if (scrollHost != null && delta != 0f) {
+            float px = -delta * 55f * getResources().getDisplayMetrics().density;
+            crownPendingPx += px;
+            // 旋转刻度震动: 攒满一格滚一次钟表滴答,和系统列表的表冠手感一致
+            crownTickAcc += px;
+            float detent = CROWN_DETENT_DP * getResources().getDisplayMetrics().density;
+            while (Math.abs(crownTickAcc) >= detent) {
+                crownTickAcc -= Math.signum(crownTickAcc) * detent;
+                scrollHost.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+            }
+            if (!crownPumping) {
+                crownPumping = true;
+                ui.post(crownPump);
+            }
+            return true;
+        }
+        return super.onGenericMotionEvent(e);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        // 手表应用切后台就断开,省电;挂起的重连任务一并取消,别在后台偷连占着耳机
+        resumed = false;
+        // 收掉滚动泵,别在后台空转
+        ui.removeCallbacks(crownPump);
+        crownPumping = false;
+        crownPendingPx = 0;
+        crownTickAcc = 0;
         ui.removeCallbacks(refresher);
         if (reconnectTask != null) {
             ui.removeCallbacks(reconnectTask);
@@ -223,34 +288,6 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
             client.disconnect();
             client = null;
         }
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        // 回到前台,撤销后台自杀倒计时
-        if (bgExit != null) ui.removeCallbacks(bgExit);
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        // 后台15秒自动暴毙: 空进程赖在后台也不省电,磁贴/切换服务都是系统按需拉起的;
-        // 切换服务正在连耳机时先让路,等它收工再死
-        if (bgExit == null) {
-            bgExit = new Runnable() {
-                @Override public void run() {
-                    if (ModeCyclerService.running) {
-                        ui.postDelayed(this, 3000);
-                        return;
-                    }
-                    finishAndRemoveTask();
-                    android.os.Process.killProcess(android.os.Process.myPid());
-                }
-            };
-        }
-        ui.removeCallbacks(bgExit);
-        ui.postDelayed(bgExit, 15000);
     }
 
     /** 首次启用空间音频的个别化风险确认框,确认后记住(spatial_ack) */
@@ -365,9 +402,6 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         status.setText(R.string.status_connecting);
         sub.setTextColor(COL_LABEL_GRAY);
         sub.setText(target.getName());
-        // 记下 MAC 给磁贴做实时连接状态判断
-        getSharedPreferences("cfg", MODE_PRIVATE).edit()
-                .putString("tile_mac", target.getAddress()).apply();
         client = new GaiaClient(this);
         connectStartAt = SystemClock.elapsedRealtime();
         client.connect(target);
@@ -421,11 +455,8 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
 
     @Override
     public void onConnected(final String deviceName) {
-        getSharedPreferences("cfg", MODE_PRIVATE).edit()
-                .putString("tile_status", "已连接")
-                .putLong("tile_last_ok", System.currentTimeMillis())
-                .putString("tile_name", deviceName == null ? "vivo 耳机" : deviceName)
-                .apply();
+        TileStore.saveName(this, deviceName);
+        TileStore.noteOk(this);
         ui.post(new Runnable() {
             @Override public void run() {
                 status.setTextColor(Color.WHITE);
@@ -441,32 +472,10 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         setBatt(pctL, barL, left, (chargeFlags & 0x01) != 0);
         setBatt(pctR, barR, right, (chargeFlags & 0x02) != 0);
         setBatt(pctC, barC, box, (chargeFlags & 0x04) != 0);
-        // 给系统磁贴留快照(磁贴每 2 分钟读一次)
-        SharedPreferences tileCfg = getSharedPreferences("cfg", MODE_PRIVATE);
-        tileCfg.edit()
-                .putLong("tile_last_ok", System.currentTimeMillis())
-                .putString("tile_batt",
-                        fmtBatt("左", left) + "  " + fmtBatt("右", right)
-                                + "  盒 " + fmtBatt("盒", box)
-                                + (((chargeFlags & 0x07) != 0) ? " ⚡" : ""))
-                .putInt("tile_batt_l", left)
-                .putInt("tile_batt_r", right)
-                .putInt("tile_batt_c", box)
-                .apply();
-        refreshTiles();
-    }
-
-    private static String fmtBatt(String label, int v) {
-        if (v < 0 || v > 100) return label + " --";
-        return label + " " + v + "%";
-    }
-
-    /** 数据变了就叫系统立刻重画磁贴,不等 2 分钟的刷新周期 */
-    private void refreshTiles() {
-        try {
-            TileService.getUpdater(this).requestUpdate(TwsTileService.class);
-        } catch (Exception ignored) {
-        }
+        // 给系统磁贴留快照
+        TileStore.saveBattery(this, left, right, box);
+        TileStore.noteOk(this);
+        TileStore.push(this);
     }
 
     @Override
@@ -474,14 +483,8 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         lastMode = mode;
         renderMode();
         // 给降噪切换磁贴留快照
-        if (mode >= 0 && mode < 3) {
-            getSharedPreferences("cfg", MODE_PRIVATE).edit()
-                    .putInt("tile_mode", mode)
-                    .putString("tile_mode_name",
-                            new String[]{"降噪开", "降噪关", "通透"}[mode])
-                    .apply();
-        }
-        refreshTiles();
+        if (mode >= 0 && mode < 3) TileStore.saveMode(this, mode);
+        TileStore.push(this);
     }
 
     @Override
@@ -538,10 +541,8 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     @Override
     public void onDisconnected(String reason) {
         clearData();
-        getSharedPreferences("cfg", MODE_PRIVATE).edit()
-                .putString("tile_status", "未连接").apply();
         // 断开也主动推一次磁贴,别等刷新周期(周期已放宽到5分钟)
-        refreshTiles();
+        TileStore.push(this);
         ui.post(new Runnable() {
             @Override public void run() {
                 status.setTextColor(COL_LABEL_GRAY);
@@ -549,8 +550,9 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
                 sub.setText("");
             }
         });
-        // 耳机开关机/走远断连后,3 秒后自动试着连回来(存引用,切后台时取消)
-        if (!isFinishing() && !isDestroyed()) {
+        // 耳机开关机/走远断连后,3 秒后自动试着连回来;只在界面真在前台时才重连
+        // (onPause 清完旧任务后这里才投新任务,不拦 resumed 会在后台偷偷连耳机占槽位)
+        if (!isFinishing() && !isDestroyed() && resumed) {
             if (reconnectTask != null) ui.removeCallbacks(reconnectTask);
             reconnectTask = new Runnable() {
                 @Override public void run() {
