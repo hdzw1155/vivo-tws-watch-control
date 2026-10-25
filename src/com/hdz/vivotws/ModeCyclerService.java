@@ -26,11 +26,20 @@ public class ModeCyclerService extends Service implements GaiaClient.Listener {
     private int nextMode;
     private boolean done = false;
     private final Handler h = new Handler();
+
+    /** 主界面的后台自杀让路标志: 服务活着时为 true,杀进程前看一眼 */
+    static volatile boolean running = false;
     private final Runnable timeout = new Runnable() {
         @Override public void run() {
             stopSelf();
         }
     };
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        running = true;
+    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -113,6 +122,7 @@ public class ModeCyclerService extends Service implements GaiaClient.Listener {
 
     @Override
     public void onDestroy() {
+        running = false;
         h.removeCallbacksAndMessages(null);
         if (client != null) {
             client.disconnect();

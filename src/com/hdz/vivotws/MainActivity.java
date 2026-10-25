@@ -59,6 +59,7 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
     private long connectStartAt = 0;
     private Runnable refresher;
     private Runnable reconnectTask;
+    private Runnable bgExit;
     private Switch swSpatial;
     private boolean spatialGuard;
     private long spatialSetAt = 0;
@@ -222,6 +223,34 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
             client.disconnect();
             client = null;
         }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // 回到前台,撤销后台自杀倒计时
+        if (bgExit != null) ui.removeCallbacks(bgExit);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // 后台15秒自动暴毙: 空进程赖在后台也不省电,磁贴/切换服务都是系统按需拉起的;
+        // 切换服务正在连耳机时先让路,等它收工再死
+        if (bgExit == null) {
+            bgExit = new Runnable() {
+                @Override public void run() {
+                    if (ModeCyclerService.running) {
+                        ui.postDelayed(this, 3000);
+                        return;
+                    }
+                    finishAndRemoveTask();
+                    android.os.Process.killProcess(android.os.Process.myPid());
+                }
+            };
+        }
+        ui.removeCallbacks(bgExit);
+        ui.postDelayed(bgExit, 15000);
     }
 
     /** 首次启用空间音频的个别化风险确认框,确认后记住(spatial_ack) */
@@ -511,6 +540,8 @@ public class MainActivity extends Activity implements GaiaClient.Listener {
         clearData();
         getSharedPreferences("cfg", MODE_PRIVATE).edit()
                 .putString("tile_status", "未连接").apply();
+        // 断开也主动推一次磁贴,别等刷新周期(周期已放宽到5分钟)
+        refreshTiles();
         ui.post(new Runnable() {
             @Override public void run() {
                 status.setTextColor(COL_LABEL_GRAY);

@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 /** 整页磁贴: 已连接/未连接 + 耳机名 + 三个电量环(左/右/盒) + 降噪圆钮 + 打开控制 */
 public class TwsTileService extends TileService {
 
-    private static final long REFRESH_MS = 15 * 1000; // 可见时勤刷,断开状态别装傻
+    private static final long REFRESH_MS = 5 * 60 * 1000; // 15秒会逼系统整夜重画,是耗电元凶;数据变化有requestUpdate主动推,磁贴可见时系统本来就会勤问
     private static final String[] EARS = {"左", "右", "盒"};
 
     private static final class DoneFuture implements ListenableFuture<Object> {
