@@ -1,5 +1,11 @@
 # vivo TWS Watch Control
 
+[![Release](https://img.shields.io/github/v/release/hdzw1155/vivo-tws-watch-control)](https://github.com/hdzw1155/vivo-tws-watch-control/releases)
+[![License](https://img.shields.io/github/license/hdzw1155/vivo-tws-watch-control)](https://github.com/hdzw1155/vivo-tws-watch-control/blob/main/LICENSE)
+![Platform](https://img.shields.io/badge/platform-Wear%20OS%203%2B-3DDC84?logo=android&logoColor=white)
+![Dependencies](https://img.shields.io/badge/dependencies-zero-orange)
+![Data collection](https://img.shields.io/badge/data_collection-none-success)
+![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
 在 **Wear OS 手表**上直接控制 **vivo / iQOO TWS 耳机**的降噪模式与电量查询——不依赖手机，手表通过经典蓝牙 RFCOMM 直连耳机发送 vivo 私有 GAIA 指令。耳机可同时保持与手机的音频连接（双设备连接）。
 
