@@ -56,11 +56,15 @@ vivo / iQOO TWS 家族（TWS 3 代起）共用一套 GAIA 私有协议，App 按
 
 ## 📸 界面
 
-![界面](docs/screenshot-1.jpg)
+![设置页](docs/screenshot-settings.png)
 
-![界面](docs/screenshot-2.jpg)
+![经典主界面](docs/screenshot-classic.png)
 
-![磁贴](docs/screenshot-3.jpg)
+![极简主界面](docs/screenshot-minimal.png)
+
+![经典磁贴](docs/screenshot-tile.png)
+
+![液位磁贴](docs/screenshot-liquid.png)
 
 ## 🚀 快速开始
 
@@ -68,7 +72,7 @@ vivo / iQOO TWS 家族（TWS 3 代起）共用一套 GAIA 私有协议，App 按
 2. **安装 APK（任选其一）**：
    - **免电脑（推荐）**：手机安装 WearOS 工具箱 → 连接手表 → 「安装本地 APK」选择从 [Releases](../../releases) 下载的 APK。
    - **电脑 ADB**：从 [Releases](../../releases) 下载 `vivo-tws-watch-debug.apk`，执行 `adb install -r` 装到手表。
-   - **自行构建**：Windows 下依次运行 `scripts\setup-env.bat`（首次，装 JDK17 + Android SDK）→ `scripts\build.bat`（免 Gradle，一键出包）。
+   - **自行构建**：Windows 下依次运行 `scripts\setup-env.bat`（首次，装 JDK17 + Android SDK）→ `scripts\fetch-libs.bat`（拉取磁贴用到的 AndroidX 依赖，需要联网，只需跑一次）→ `scripts\build.bat`（免 Gradle，一键出包）。
 3. **授权使用**：手表上打开"vivo 耳机控制"，阅读并同意免责提示，授权"附近设备"权限即用。
 
 ## 🔧 协议要点
@@ -105,7 +109,8 @@ Wear OS 手表控制器）装到我的 Wear OS 手表上，步骤：
    自动安装（Windows 下：Microsoft JDK 17 装到 %USERPROFILE%\android-tools，
    Android 命令行工具装到 %LOCALAPPDATA%\Android\Sdk，再装
    platforms;android-34 和 build-tools;34.0.0）。
-3. 运行 scripts/build.bat 编译出 vivo-tws-watch-debug.apk（免 Gradle）。
+3. 先跑 scripts/fetch-libs.bat 拉取磁贴依赖（5 个 AndroidX jar，联网只需一次），
+   再运行 scripts/build.bat 编译出 vivo-tws-watch-debug.apk（免 Gradle）。
 4. 手表开启 开发者选项 → ADB 调试 / 无线调试，用 adb connect 连上手表后
    adb install -r 安装。
 5. 先在手表蓝牙设置里与耳机配对，再打开手表上的"vivo 耳机控制"，

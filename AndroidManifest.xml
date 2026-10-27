@@ -23,7 +23,7 @@
         <service
             android:name=".TwsTileService"
             android:exported="true"
-            android:label="vivo 耳机"
+            android:label="@string/tile_title"
             android:description="@string/tile_desc"
             android:icon="@mipmap/ic_launcher"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
@@ -32,11 +32,16 @@
             </intent-filter>
             <meta-data
                 android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@mipmap/ic_launcher" />
+                android:resource="@drawable/tile_preview" />
         </service>
 
 
 
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_title" />
 
         <activity
             android:name=".ModeCyclerActivity"

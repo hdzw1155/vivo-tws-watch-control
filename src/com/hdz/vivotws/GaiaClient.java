@@ -340,30 +340,26 @@ public class GaiaClient {
                         byte[] payload = new byte[len];
                         if (len > 0 && !readFully(in, payload, 0, len)) break;
 
-                        if (vendor == VENDOR_VIVO && cmd == RESP_BATT && payload.length >= 5) {
-                            fireBattery(payload[1] & 0xFF, payload[2] & 0xFF,
-                                    payload[3] & 0xFF, payload[4] & 0xFF);
-                        } else if (vendor == VENDOR_VIVO
-                                && (cmd == RESP_NOISE_QUERY || cmd == RESP_NOISE_SET)
-                                && payload.length >= 2) {
-                            fireMode(payload[1] & 0xFF);
-                        } else if (vendor == VENDOR_VIVO
-                                && (cmd == RESP_SPATIAL || cmd == RESP_SPATIAL_ACK)) {
-                            android.util.Log.d("GaiaClient",
-                                    "spatial cmd=0x" + Integer.toHexString(cmd)
-                                            + " payload=" + toHex(payload));
-                            fireSpatial(parseSpatial(payload));
-                        } else if (vendor == VENDOR_VIVO
-                                && (cmd == RESP_DEEPX || cmd == RESP_DEEPX_ACK)) {
-                            android.util.Log.d("GaiaClient",
-                                    "deepx cmd=0x" + Integer.toHexString(cmd)
-                                            + " payload=" + toHex(payload));
-                            fireDeepX(parseDeepX(payload));
-                        } else if (vendor == VENDOR_VIVO) {
-                            // 未知帧全量记录,留作协议分析 ground truth
-                            android.util.Log.d("GaiaClient",
-                                    "unknown cmd=0x" + Integer.toHexString(cmd)
-                                            + " payload=" + toHex(payload));
+                        // 回调里抛出的 RuntimeException 不能把整个进程带走(0.3.8 初版就崩过):
+                        // 这里兜一层, 记日志后继续读下一帧
+                        try {
+                            if (vendor == VENDOR_VIVO && cmd == RESP_BATT && payload.length >= 5) {
+                                fireBattery(payload[1] & 0xFF, payload[2] & 0xFF,
+                                        payload[3] & 0xFF, payload[4] & 0xFF);
+                            } else if (vendor == VENDOR_VIVO
+                                    && (cmd == RESP_NOISE_QUERY || cmd == RESP_NOISE_SET)
+                                    && payload.length >= 2) {
+                                fireMode(payload[1] & 0xFF);
+                            } else if (vendor == VENDOR_VIVO
+                                    && (cmd == RESP_SPATIAL || cmd == RESP_SPATIAL_ACK)) {
+                                fireSpatial(parseSpatial(payload));
+                            } else if (vendor == VENDOR_VIVO
+                                    && (cmd == RESP_DEEPX || cmd == RESP_DEEPX_ACK)) {
+                                fireDeepX(parseDeepX(payload));
+                            } else {
+                            }
+                        } catch (RuntimeException e) {
+                            android.util.Log.e("GaiaClient", "listener dispatch failed", e);
                         }
                     }
                     if (!closing) fireDisconnected("连接已关闭");

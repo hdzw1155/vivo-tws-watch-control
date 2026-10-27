@@ -6,7 +6,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
@@ -38,9 +37,12 @@ public class ModeCyclerService extends Service implements GaiaClient.Listener {
             stopSelf();
             return START_NOT_STICKY;
         }
-        SharedPreferences cfg = getSharedPreferences("cfg", MODE_PRIVATE);
-        int last = cfg.getInt("tile_mode", GaiaClient.MODE_OFF);
-        // 磁贴传来的指定档位(点谁切谁,0..2); 没传或越界就循环下一档
+        // 上次记下的档位; 从没连过时按"关闭"起算, 保持老版本的点按顺序不变
+        int last = TileStore.read(this).mode;
+        if (last < GaiaClient.MODE_ANC || last > GaiaClient.MODE_TRANS) {
+            last = GaiaClient.MODE_OFF;
+        }
+        // 磁贴传来的指定档位(点谁切谁, 0..2); 没传或越界就循环下一档
         int wanted = intent != null ? intent.getIntExtra("target_mode", -1) : -1;
         nextMode = (wanted >= 0 && wanted <= 2) ? wanted : (last + 1) % 3;
 
@@ -80,9 +82,11 @@ public class ModeCyclerService extends Service implements GaiaClient.Listener {
     public void onNoiseMode(int mode) {
         // 耳机确认了新模式,记下来让磁贴和主界面显示正确
         if (mode < 0 || mode > 2 || mode != nextMode) return;
-        TileStore.saveMode(this, mode);
+        boolean changed = TileStore.saveMode(this, mode);
         TileStore.noteOk(this);
-        TileStore.push(this);
+        if (changed) {
+            TileStore.push(this);
+        }
         complete();
     }
 

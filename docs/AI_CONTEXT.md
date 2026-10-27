@@ -50,7 +50,7 @@ FF | VERB | 00 | LEN | VENDOR(2B 大端) | CMD(2B 大端) | PAYLOAD(LEN 字节)
 | 握手 | 0x0300 | - | - | 0x8300 | ✅ 实测 |
 | 电量 | - | 0x0207(恒v4) | - | 0x8207 | ✅ 实测 |
 | 降噪 | 0x0130 | 0x0230 | 0x8130 | 0x8230 | ✅ 实测 |
-| 空间音频开关 | 0x0139 | 0x0239 | 0x8139 | 0x8239 | ⚠ 半验证（见 §4） |
+| 空间音频开关 | 0x0139 | 0x0239 | 0x8139 | 0x8239 | ⚠ 半验证（社区推断三档，见 §7） |
 | DeepX 音效 | 0x0118 | 0x0218 | 0x8118 | 0x8218 | ✅ 实测 |
 | 空间音效预设 | 0x013E | 0x023E | - | - | ❌ 无应答，弃 |
 | 佩戴检测开关 | 0x0103 | 0x0203 | 0x8103 | 0x8203 | 文档实测(3e) |
@@ -63,7 +63,11 @@ FF | VERB | 00 | LEN | VENDOR(2B 大端) | CMD(2B 大端) | PAYLOAD(LEN 字节)
   尾缀按机型：Air3 Pro=`04 00`，TWS 3e=`03`，家族默认(=TWS4)=`03 01`
 - DeepX SET：`[mode]` 单字节，**真实值 0/1/2/3/5（0x04 被官方跳过！）**：
   0=标准 1=清澈人声 2=超重低音 3=清亮高音 5=悠扬听书
-- 空间音频 SET：`[01]`开 `[00]`关；上报 `[00, 状态, 01]`，状态随摘戴自动变
+- 空间音频 SET：`[01]`开 `[00]`关；上报 `[00, 状态, 01]`，状态随摘戴自动变。
+  2026-10 社区逆向结论（未真机确认）：**实为三档 `[mode]` 0=关 / 1=固定 / 2=头部追踪**，
+  有场景参数时 `[mode, scene]`，查询 0x0239 上报 `[00, mode, scene?]`。官方 App 另有
+  剧场/演唱会/录音棚/音乐厅四场景。**本 App 以前只发 `[01]`（固定档），所以听不出变化是正常的**，
+  不是指令无效。另注意 vivo 官网写"非 vivo/iQOO 手机仅支持空间音频标准模式"，手表端未必有头追渲染。
 - 降噪上报 0x8230：`[00, mode, 效果, 效果]`
 
 ### 机型判定
@@ -134,14 +138,25 @@ tiles 1.1 的 API 和新版教程差异（全踩过）：
 **Canvas 画字五轮才修好的坑**：画完弧线后 Paint 停在 STROKE 模式，直接 drawText 出来的
 全是描边轮廓（一团白色乱码）。写字前必须 `p.setStyle(Paint.Style.FILL)` 复位。
 
-**磁贴数据流**：磁贴进程读不到耳机的实时状态，用两条路：
-1. App/无界面切换器把快照写进 SharedPreferences（tile_batt_l/r/c、tile_mode 等），
-   磁贴 onTileRequest 时读；
-2. 连接状态用 TileState 实时查（记住耳机 MAC → 反射 `BluetoothDevice.isConnected()` →
-   GATT 已连接列表 → 30 分钟内成功通讯过的 last_ok 时间戳兜底——半入耳双链路空闲时
-   系统查询会漏判，单一手段都会误报"未连接"）
-数据变化后用 `TileService.getUpdater(ctx).requestUpdate(XxxTile.class)` 立即重画，
-不用等 freshnessIntervalMillis（设的 2 分钟）。
+**磁贴代码结构（0.3.8 起拆开，别再塞回一个文件）**：
+- `TwsTileService`：薄入口，只响应系统两次请求，异常全部自兜底（布局失败→`fallback`→
+  纯字面量 `minimal`；资源失败→`TileResources.empty`）。原因：tiles-1.1.0 调我们的回调时
+  只接 protobuf 异常，RuntimeException 会一路逃到主线程直接崩进程（不是"磁贴变红"）。
+- `TileSnapshot` / `TileStore`：数据契约与快照读写（一次读齐；写方法返回"是否变化"）
+- `TileLayouts` / `TileResources`：布局树与资源表（资源 id 必须两边一致：`ring_l/r/c`、`ic_off/trans/anc`）
+- `BatteryRingPainter`：电量环位图（画图细节见上）
+- `TileFutures`：无 Guava 的 ListenableFuture（immediate + 后台 submit 画图）。
+  **addListener 里禁止 get() 阻塞**：tiles 给的 Executor 是把 Runnable post 到主线程的，
+  阻塞会让主线程陪着编 PNG，界面顿一下。
+
+**磁贴数据流**：磁贴进程读不到耳机实时状态，只展示"最后一次成功通讯的快照"。
+SharedPreferences `cfg` 里的 `tile_name` / `tile_last_ok` / `tile_batt_l/r/c` / `tile_mode`
+只由 `TileStore` 读写，别在其他地方裸用键名。连上/切档/收到电量时 `noteOk()` 存时间戳，
+磁贴顶行只陈述事实："上一次连接 21:40"——旧的实时连接探测（反射 isConnected / GATT 列表）
+会因为双链路漏判误报"未连接"，已撤掉。
+数据变化才 `TileService.getUpdater(ctx).requestUpdate(...)`：电量值没变、分钟数没变就不推
+（轮询每 30 秒一次，见 `MainActivity.onBattery`）。频繁推会让系统整夜重画磁贴，是耗电元凶；
+但"上一次连接"分钟数变了要推一次，不然磁贴上的时间会一直停在连上那一刻。
 
 **磁贴点击直切模式**：跳转一个透明无 UI 的 exported Activity（`Theme.Translucent.NoTitleBar`
 + excludeFromRecents + noHistory），onConnected 后 setNoiseMode、收到确认即 finish，
@@ -175,14 +190,25 @@ tiles 1.1 的 API 和新版教程差异（全踩过）：
 
 ## 7. 待办与线索
 
-- 当前版本 0.3.0（versionCode 13）；免责弹窗按 versionCode 记忆，改版本号会重新弹
-- DeepX 的 3=清亮高音、5=悠扬听书 未实测（0/1/2 已验证）；想验证照 §3 方法点两下按钮看日志
+- 当前版本 0.3.8（versionCode 20）；免责弹窗按 versionCode 记忆，改版本号会重新弹
+- DeepX 的 3=清亮高音、5=悠扬听书 未实测听感（0/1/2 已验证）；想验证照 §3 方法点两下按钮看日志。
+  2026-10 社区核对官方 audio_effect 表（TIANLI0/EncoDeck）：表版本 4/12 → 0,1,2,3,5；
+  5/13/6/14 → 0..5（含 4=沉浸环绕）；28 → 再加 11=至臻大师。Air3 Pro 用表版本 4，本就不含 4
+- 空间音频定性：2026-10 社区结论（Zhaoyi-ya/OppoPodsManager）指 0x0139 是三档 `[mode]` 0/1/2 +
+  可选场景字节，我们过去只发 `[01]`（固定档）。下一步：发 `[00]/[01]/[02]` 各听一遍，
+  再试 `[mode, 00..03]` 找官方四场景；最终定性仍要 btsnoop 对照官方 App
 - 空间音频想定性：需要手机开"蓝牙 HCI 信息收集"抓官方 App 的 btsnoop 对照
   （vivo 手机 dumpstate 被封，bugreport 拿不到日志，需 root 或换机型）
 - 仓库 scripts/parse_btsnoop.js：写好的 btsnoop GAIA 帧扫描器，抓到日志直接 `node` 跑
 - 更多机型：TWS-Pods-PC 仓库有 huawei/ xiaomi/ moondrop/ 同族文档可挖
   （多品牌续作见本地姊妹项目 tws-control-for-wear，注意其华为/小米协议层未实测）
-- 图标：res/mipmap/ic_launcher.png，用户偏好小尺寸原图（80×80 即可，别上高清大图）
+- 图标：0.3.8 起改为自适应矢量图标（minSdk 30，无需 PNG 回退）：
+  res/mipmap-anydpi-v26/ic_launcher.xml = 米白底 @color/ic_launcher_background + 前景层
+  res/drawable/ic_launcher_foreground.xml（至上海报几何，group scale 0.5733 / translate 213.35
+  把 1000 viewport 内容缩进 72dp 安全区）+ 单色层 ic_launcher_monochrome.xml
+  （API 33+ 主题图标用）；设计源文件在 assets/app-icon.svg。
+  磁贴 PREVIEW 用 res/drawable/tile_preview.xml（全幅米白底 + 同一套几何，scale 0.86），
+  与桌面图标共用几何、不要另外画一套。
 
 ## 8. 给你的 AI 的引导提示词（复制即用）
 
